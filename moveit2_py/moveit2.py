@@ -111,6 +111,33 @@ class MoveIt2Interface(Node):
             self.gripper_max_width = 1.0471976
             self.gripper_max_speed = 1.57
             self.gripper_max_force = 10.6
+        elif 'tm12' == robot_model:
+            self.robot_group_name = "tm12"
+            # Arm
+            self.arm_group_name = "tmr_arm"
+            self.arm_joints = ["shoulder_1_joint", 
+                                "shoulder_2_joint", 
+                                "elbow_joint", 
+                                "wrist_1_joint", 
+                                "wrist_2_joint", 
+                                "wrist_3_joint"]
+            self.arm_links = ["base_link",
+                              "shoulder_1_link",
+                              "arm_1_link",
+                              "arm_2_link",
+                              "wrist_1_link",
+                              "wrist_2_link",
+                              "wrist_3_link",
+                              "tool0"]
+            self.arm_base_link = self.arm_links[0]
+            self.arm_end_effector = self.arm_links[-1]
+            # Gripper
+            self.gripper_group_name = "rg2"
+            self.gripper_joints = ["rg2_finger_joint1",
+                                   "rg2_finger_joint2"]
+            self.gripper_max_width = 1.0471976
+            self.gripper_max_speed = 1.57
+            self.gripper_max_force = 10.6
 
         # Publisher of trajectories
         self.joint_trajectory_pub = self.create_publisher(JointTrajectory,
