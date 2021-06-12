@@ -30,7 +30,7 @@ import math
 
 class MoveIt2Interface(Node):
 
-    def __init__(self, separate_gripper_controller: bool = False, use_sim_time: bool = True, node_name: str = 'ign_moveit2_py', robot_model: str = 'panda'):
+    def __init__(self, separate_gripper_controller: bool = False, use_sim_time: bool = True, node_name: str = 'ign_moveit2_py', robot_model: str = 'tm12'):
         """
         robot_model - 'panda' and 'ur5_rg2' are supported
         """
@@ -115,12 +115,12 @@ class MoveIt2Interface(Node):
             self.robot_group_name = "tm12"
             # Arm
             self.arm_group_name = "tmr_arm"
-            self.arm_joints = ["shoulder_1_joint", 
-                                "shoulder_2_joint", 
-                                "elbow_joint", 
-                                "wrist_1_joint", 
-                                "wrist_2_joint", 
-                                "wrist_3_joint"]
+            self.arm_joints = ["joint1",
+                               "joint2",
+                               "joint3",
+                               "joint4",
+                               "joint5",
+                               "joint6"]
             self.arm_links = ["base_link",
                               "shoulder_1_link",
                               "arm_1_link",

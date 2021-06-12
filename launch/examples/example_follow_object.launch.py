@@ -31,7 +31,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 [os.path.join(get_package_share_directory('ign_moveit2'),
-                              'launch', 'ign_moveit2.launch.py')]),
+                              'launch', 'ign_moveit2_tm12.launch.py')]),
             launch_arguments=[('use_sim_time', use_sim_time),
                               ('config_rviz2', config_rviz2)]),
 

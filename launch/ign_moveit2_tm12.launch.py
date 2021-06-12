@@ -56,10 +56,10 @@ def generate_launch_description():
              executable='parameter_bridge',
              name='parameter_bridge_joint_states',
              output='screen',
-             arguments=['/world/default/model/panda/joint_state@sensor_msgs/msg/JointState[ignition.msgs.Model',
+             arguments=['/world/default/model/TM12/joint_state@sensor_msgs/msg/JointState[ignition.msgs.Model',
                         '--ros-args', '--log-level', log_level],
              parameters=[{'use_sim_time': use_sim_time}],
-             remappings=[('/world/default/model/panda/joint_state', '/joint_states')]),
+             remappings=[('/world/default/model/TM12/joint_state', '/joint_states')]),
 
         # JointTrajectory bridge (ROS2 -> IGN)
         Node(package='ros_ign_bridge',

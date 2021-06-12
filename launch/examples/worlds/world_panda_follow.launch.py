@@ -12,7 +12,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     world = os.path.join(get_package_share_directory('ign_moveit2'),
-                         'worlds', 'panda_follow.sdf')
+                         'worlds', 'tm12_follow.sdf')
 
     # Launch Arguments
     use_sim_time = LaunchConfiguration('use_sim_time', default=True)
