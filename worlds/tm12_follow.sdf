@@ -174,12 +174,12 @@
 
             <!-- Joint state publisher -->
             <plugin filename="libignition-gazebo-joint-state-publisher-system.so" name="ignition::gazebo::systems::JointStatePublisher">
-                <joint_name>joint1</joint_name>
-                <joint_name>joint2</joint_name>
-                <joint_name>joint3</joint_name>
-                <joint_name>joint4</joint_name>
-                <joint_name>joint5</joint_name>
-                <joint_name>joint6</joint_name>
+                <joint_name>joint_1</joint_name>
+                <joint_name>joint_2</joint_name>
+                <joint_name>joint_3</joint_name>
+                <joint_name>joint_4</joint_name>
+                <joint_name>joint_5</joint_name>
+                <joint_name>joint_6</joint_name>
                 <!-- <joint_name>panda_joint7</joint_name>
                 <joint_name>panda_finger_joint1</joint_name>
                 <joint_name>panda_finger_joint2</joint_name> -->
@@ -189,7 +189,7 @@
             <plugin filename="libignition-gazebo-joint-trajectory-controller-system.so" name="ignition::gazebo::systems::JointTrajectoryController">
                 <topic>joint_trajectory</topic>
 
-                <joint_name>joint1</joint_name>
+                <joint_name>joint_1</joint_name>
                 <initial_position>0</initial_position>
                 <position_p_gain>3000</position_p_gain>
                 <position_d_gain>15</position_d_gain>
@@ -199,7 +199,7 @@
                 <position_cmd_min>-87</position_cmd_min>
                 <position_cmd_max>87</position_cmd_max>
 
-                <joint_name>joint2</joint_name>
+                <joint_name>joint_2</joint_name>
                 <initial_position>0</initial_position>
                 <position_p_gain>9500</position_p_gain>
                 <position_d_gain>47.5</position_d_gain>
@@ -209,7 +209,7 @@
                 <position_cmd_min>-87</position_cmd_min>
                 <position_cmd_max>87</position_cmd_max>
 
-                <joint_name>joint3</joint_name>
+                <joint_name>joint_3</joint_name>
                 <initial_position>0</initial_position>
                 <position_p_gain>6500</position_p_gain>
                 <position_d_gain>32.5</position_d_gain>
@@ -219,7 +219,7 @@
                 <position_cmd_min>-87</position_cmd_min>
                 <position_cmd_max>87</position_cmd_max>
 
-                <joint_name>joint4</joint_name>
+                <joint_name>joint_4</joint_name>
                 <initial_position>-1.57</initial_position>
                 <position_p_gain>6000</position_p_gain>
                 <position_d_gain>30</position_d_gain>
@@ -229,7 +229,7 @@
                 <position_cmd_min>-87</position_cmd_min>
                 <position_cmd_max>87</position_cmd_max>
 
-                <joint_name>joint5</joint_name>
+                <joint_name>joint_5</joint_name>
                 <initial_position>0</initial_position>
                 <position_p_gain>2750</position_p_gain>
                 <position_d_gain>2.75</position_d_gain>
@@ -239,7 +239,7 @@
                 <position_cmd_min>-12</position_cmd_min>
                 <position_cmd_max>12</position_cmd_max>
 
-                <joint_name>joint6</joint_name>
+                <joint_name>joint_6</joint_name>
                 <initial_position>1.57</initial_position>
                 <position_p_gain>2500</position_p_gain>
                 <position_d_gain>2.5</position_d_gain>

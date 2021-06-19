@@ -12,7 +12,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     # Launch Arguments
-    use_sim_time = LaunchConfiguration('use_sim_time', default=True)
+    use_sim_time = LaunchConfiguration('use_sim_time', default=False)
     config_rviz2 = LaunchConfiguration('config_rviz2', default=os.path.join(get_package_share_directory('ign_moveit2'),
     'launch', 'rviz.rviz'))
     log_level = LaunchConfiguration('log_level', default='error')
@@ -35,8 +35,10 @@ def generate_launch_description():
         # MoveIt2 move_group action server
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                [os.path.join(get_package_share_directory('tmr_move_group_demo'),
-                              'launch', 'run_move_group.launch.py')]),
+                 [os.path.join(get_package_share_directory('panda_moveit2_config'),
+                              'launch', 'move_group_action_server.launch.py')]),
+                # [os.path.join(get_package_share_directory('tmr_move_group_demo'),
+                #               'launch', 'run_move_group.launch.py')]),
             # Simulation time does not function properly (as of Nov 2020), see https://github.com/AndrejOrsula/ign_moveit2/issues/4
             launch_arguments=[('use_sim_time', 'False'),
                               ('config_rviz2', config_rviz2),

@@ -38,16 +38,16 @@ def generate_launch_description():
                               ),
 
         # Launch world
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                [os.path.join(get_package_share_directory('ign_moveit2'),
-                              'launch', 'examples', 'worlds', 'world_tm12_follow.launch.py')]),
-            launch_arguments=[('use_sim_time', use_sim_time)]),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         [os.path.join(get_package_share_directory('ign_moveit2'),
+        #                       'launch', 'examples', 'worlds', 'world_tm12_follow.launch.py')]),
+        #     launch_arguments=[('use_sim_time', use_sim_time)]),
 
         # Python example script (object follower with planned trajectories)
-        Node(name='ign_moveit2_example_follow_object',
-             package='ign_moveit2',
-             executable='example_follow_object.py',
-             output='screen',
-             parameters=[{'use_sim_time': use_sim_time}])
+        # Node(name='ign_moveit2_executepython',
+        #      package='ign_moveit2',
+        #      executable='executepython.py',
+        #      output='screen',
+        #      parameters=[{'use_sim_time': use_sim_time}])
     ])

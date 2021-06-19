@@ -20,11 +20,10 @@ def main(args=None):
     # Set joint target to reach
     joint_positions = [1.5707963,
                        1.5707963,
-                       1.5707963,
+                       -1.5707963,
                        -1.5707963,
                        1.5707963,
-                       3.1415927,
-                       0.0]
+                       3.1415927]
     moveit2.set_joint_goal(joint_positions)
 
     # Plan and execute

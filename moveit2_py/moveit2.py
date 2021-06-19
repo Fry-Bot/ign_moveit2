@@ -23,7 +23,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint
 from moveit_msgs.msg import PositionIKRequest, RobotTrajectory
 from moveit_msgs.srv import GetPositionIK, GetPositionFK, GetMotionPlan, GetCartesianPath
-from moveit_msgs.action import MoveGroup
+from moveit_msgs.action import MoveGroup, ExecuteTrajectory
 from action_msgs.msg import GoalStatus
 import math
 
@@ -46,7 +46,11 @@ class MoveIt2Interface(Node):
         self.init_plan_kinematic_path()
         self.init_plan_cartesian_path()
         self.init_gripper()
+        self.init_execute_trajectory()
         self.get_logger().info("ign_moveit2_py initialised successfuly")
+
+    def log(self, message):
+        self.get_logger().info(message)
 
     def init_robot(self, robot_model, separate_gripper_controller):
         """
@@ -115,12 +119,12 @@ class MoveIt2Interface(Node):
             self.robot_group_name = "tm12"
             # Arm
             self.arm_group_name = "tmr_arm"
-            self.arm_joints = ["joint1",
-                               "joint2",
-                               "joint3",
-                               "joint4",
-                               "joint5",
-                               "joint6"]
+            self.arm_joints = ["joint_1",
+                               "joint_2",
+                               "joint_3",
+                               "joint_4",
+                               "joint_5",
+                               "joint_6"]
             self.arm_links = ["base_link",
                               "shoulder_1_link",
                               "arm_1_link",
@@ -161,13 +165,16 @@ class MoveIt2Interface(Node):
         self.joint_progress_sub = self.create_subscription(Float32,
                                                            "joint_trajectory_progress",
                                                            self.joint_progress_callback, 1)
-
+        self.got_joint_state = None                                                   
     def joint_state_callback(self, msg):
         """
         Callback for getting current joint states.
         """
         self.joint_state_mutex.acquire()
         self.joint_state = msg
+        if self.got_joint_state == None:
+            self.log(str(msg))
+            self.got_joint_state = msg
         self.joint_state_mutex.release()
 
     def get_joint_state(self) -> JointState:
@@ -177,6 +184,8 @@ class MoveIt2Interface(Node):
         self.joint_state_mutex.acquire()
         joint_state = self.joint_state
         self.joint_state_mutex.release()
+        self.log("Getting joint state")
+        self.log(str(joint_state))
         return joint_state
 
     def joint_progress_callback(self, msg):
@@ -205,12 +214,20 @@ class MoveIt2Interface(Node):
                 self.gripper_trajectory_pub.publish(trajectory)
             else:
                 self.joint_trajectory_pub.publish(trajectory)
+                goal = ExecuteTrajectory.Goal()
+                robot_traj = RobotTrajectory()
+                robot_traj.joint_trajectory = trajectory
+                goal.trajectory = robot_traj
+                self.execute_trajectory_client.send_goal_async(goal)
         elif isinstance(trajectory, RobotTrajectory):
             if is_gripper and self.use_separate_gripper_controller:
                 self.gripper_trajectory_pub.publish(
                     trajectory.joint_trajectory)
             else:
                 self.joint_trajectory_pub.publish(trajectory.joint_trajectory)
+                goal = ExecuteTrajectory.Goal()
+                goal.trajectory = trajectory
+                self.execute_trajectory_client.send_goal_async(goal)
         else:
             raise Exception("Invalid type passed into pub_trajectory()")
 
@@ -218,7 +235,7 @@ class MoveIt2Interface(Node):
         """
         Execute last planned motion plan, or the `joint_trajectory` specified as argument.
         """
-
+        self.get_logger().info("Starting execution")
         if joint_trajectory == None:
             plan = self.motion_plan_.joint_trajectory
         else:
@@ -227,8 +244,8 @@ class MoveIt2Interface(Node):
         # Make sure there is a plan to follow
         if not plan.points:
             # TODO: re-enable warning, but add an optional debug level to configuration
-            # self.get_logger().warn(
-            #     "Cannot execute motion plan because it does not contain any trajectory points")
+            self.get_logger().warn(
+                "Cannot execute motion plan because it does not contain any trajectory points")
             return False
 
         # Reset joint progress
@@ -275,6 +292,11 @@ class MoveIt2Interface(Node):
         joint_trajectory.points.append(point)
         self.pub_trajectory(joint_trajectory)
 
+    def init_execute_trajectory(self):
+        self.execute_trajectory_client = ActionClient(self, ExecuteTrajectory, 'execute_trajectory')
+        while not self.execute_trajectory_client.wait_for_server(timeout_sec=1.0):
+            self.get_logger().info(
+                "Server [execute_trajectory] not currently available, waiting...")
     # compute_fk
     def init_compute_fk(self):
         """
@@ -294,6 +316,7 @@ class MoveIt2Interface(Node):
         # self.fk_request.robot_state.multi_dof_joint_state = "Ignored"
         # self.fk_request.robot_state.attached_collision_objects = "Ignored"
         self.fk_request.robot_state.is_diff = False
+
 
     def compute_fk(self, fk_link_names=None, joint_state=None) -> GetPositionFK.Response:
         """
@@ -446,11 +469,12 @@ class MoveIt2Interface(Node):
                 position_constraint.header.stamp = clock_time_now_msg
             for orientation_constraint in contraints.orientation_constraints:
                 orientation_constraint.header.stamp = clock_time_now_msg
+        # set robot state
+        self.kinematic_path_request.motion_plan_request.start_state.joint_state = self.get_joint_state()
 
         self.plan_kinematic_path_client.wait_for_service()
         response = self.plan_kinematic_path_client.call(
             self.kinematic_path_request)
-
         self.clear_goal_constraints()
         self.motion_plan_ = response.motion_plan_response.trajectory
 
