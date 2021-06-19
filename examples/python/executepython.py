@@ -18,7 +18,9 @@ def main(args=None):
     thread.start()
 
     time.sleep(5)
-    
+    computed = moveit2.compute_fk()
+    moveit2.log(str(computed))
+
     moveit2.log("starting planning")
     # Set pose goal to reach
     position = [0.8, 0, 0.1]
@@ -30,9 +32,11 @@ def main(args=None):
     moveit2.log("planning done, starting execution")
     moveit2.execute()
     moveit2.log("execution")
-    moveit2.wait_until_executed()
-    moveit2.log("executed")
+    computed = moveit2.compute_fk()
+    moveit2.log(str(computed))
     time.sleep(10);
+    computed = moveit2.compute_fk()
+    moveit2.log(str(computed))
 
     # Set pose goal to reach
     position = [0.5, 0.5, 0.5]
@@ -45,6 +49,10 @@ def main(args=None):
     moveit2.log("execution")
     moveit2.wait_until_executed()
     moveit2.log("executed")
+
+
+    computed = moveit2.compute_fk()
+    moveit2.log(str(computed))
 
     rclpy.shutdown()
 
