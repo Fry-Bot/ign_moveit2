@@ -173,7 +173,6 @@ class MoveIt2Interface(Node):
         self.joint_state_mutex.acquire()
         self.joint_state = msg
         if self.got_joint_state == None:
-            self.log(str(msg))
             self.got_joint_state = msg
         self.joint_state_mutex.release()
 
@@ -184,8 +183,6 @@ class MoveIt2Interface(Node):
         self.joint_state_mutex.acquire()
         joint_state = self.joint_state
         self.joint_state_mutex.release()
-        self.log("Getting joint state")
-        self.log(str(joint_state))
         return joint_state
 
     def joint_progress_callback(self, msg):
