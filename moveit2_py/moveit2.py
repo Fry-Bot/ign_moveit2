@@ -359,7 +359,7 @@ class MoveIt2Interface(Node):
         # self.ik_request.ik_request.pose_stamped.pose = "Set during request"
         # self.ik_request.ik_request.ik_link_names = "Ignored"
         # self.ik_request.ik_request.pose_stamped_vector = "Ignored"
-        # self.ik_request.ik_request.timeout.sec = "Ignored"
+        # self.ik_request.ik_request.timeout.sec = 5.0 # "Ignored"
         # self.ik_request.ik_request.timeout.nanosec = "Ignored"
 
     def compute_ik(self, pose, start_joint_state=None, constrains=None) -> GetPositionIK.Response:
@@ -443,7 +443,7 @@ class MoveIt2Interface(Node):
 
     def plan_kinematic_path(self,
                             allowed_planning_time=5.0,
-                            num_planning_attempts=10) -> GetMotionPlan.Response:
+                            num_planning_attempts=10, attached_collision_objects = []) -> GetMotionPlan.Response:
         """
         Call `plan_kinematic_path` service, with goal set using either `set_joint_goal()`,
         `set_position_goal()`, `set_orientation_goal()` or `set_pose_goal()`.
@@ -468,6 +468,8 @@ class MoveIt2Interface(Node):
                 orientation_constraint.header.stamp = clock_time_now_msg
         # set robot state
         self.kinematic_path_request.motion_plan_request.start_state.joint_state = self.get_joint_state()
+        self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = \
+            attached_collision_objects
 
         self.plan_kinematic_path_client.wait_for_service()
         response = self.plan_kinematic_path_client.call(
@@ -503,7 +505,7 @@ class MoveIt2Interface(Node):
         if joint_names == None:
             joint_names = self.arm_joints
 
-        for i in range(len(joint_positions)):
+        for i in range(min(len(joint_positions), 6)):
             joint_constraint = JointConstraint()
             joint_constraint.joint_name = joint_names[i]
             joint_constraint.position = joint_positions[i]
