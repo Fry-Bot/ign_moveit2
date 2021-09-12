@@ -7,7 +7,7 @@ Note: There is no Ignition-specific code in this module (this repo is just a con
 """
 
 import threading
-from typing import Optional
+from typing import Optional, Sequence
 
 import rclpy
 from rclpy.node import Node
@@ -20,8 +20,7 @@ from geometry_msgs.msg import Pose, Quaternion
 from shape_msgs.msg import SolidPrimitive
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint
-from moveit_msgs.msg import PositionIKRequest, RobotTrajectory
+from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint, TrajectoryConstraints,PositionIKRequest, RobotTrajectory
 from moveit_msgs.srv import GetPositionIK, GetPositionFK, GetMotionPlan, GetCartesianPath
 from moveit_msgs.action import MoveGroup, ExecuteTrajectory
 from action_msgs.msg import GoalStatus
@@ -410,7 +409,7 @@ class MoveIt2Interface(Node):
         # self.kinematic_path_request.motion_plan_request.path_constraints = "Ignored"
         # self.kinematic_path_request.motion_plan_request.trajectory_constraints = "Ignored"
         # self.kinematic_path_request.motion_plan_request.reference_trajectories = "Ignored"
-        self.kinematic_path_request.motion_plan_request.planner_id = "BiTRRT"
+        # self.kinematic_path_request.motion_plan_request.planner_id = "BiTRRT"
         self.kinematic_path_request.motion_plan_request.pipeline_id = "move_group"
         self.kinematic_path_request.motion_plan_request.group_name = self.arm_group_name
         # self.kinematic_path_request.motion_plan_request.num_planning_attempts = \
@@ -444,7 +443,7 @@ class MoveIt2Interface(Node):
 
     def plan_kinematic_path(self,
                             allowed_planning_time=5.0,
-                            num_planning_attempts=10, attached_collision_objects = []) -> GetMotionPlan.Response:
+                            num_planning_attempts=10, attached_collision_objects = [], reference_trajectories = None) -> GetMotionPlan.Response:
         """
         Call `plan_kinematic_path` service, with goal set using either `set_joint_goal()`,
         `set_position_goal()`, `set_orientation_goal()` or `set_pose_goal()`.
@@ -472,6 +471,11 @@ class MoveIt2Interface(Node):
         self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = \
             attached_collision_objects
 
+        # # set trajectory constraints
+        if reference_trajectories is not None:
+            self.kinematic_path_request.motion_plan_request.reference_trajectories = reference_trajectories
+        else:
+            self.kinematic_path_request.motion_plan_request.reference_trajectories = None
         self.plan_kinematic_path_client.wait_for_service()
         response = self.plan_kinematic_path_client.call(
             self.kinematic_path_request)
@@ -586,17 +590,55 @@ class MoveIt2Interface(Node):
         """
         Initialise `compute_cartesian_path` service.
         """
-        # TODO
-        pass
+        # Service client for IK
+        self.plan_cartesian_path_client = self.create_client(GetCartesianPath,
+                                                             "compute_cartesian_path")
+        while not self.plan_cartesian_path_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(
+                "Service [compute_cartesian_path] not currently available, waiting...")
 
-    def plan_cartesian_path(self, pose,
-                            start_joint_state=None,
-                            constrains=None) -> GetCartesianPath.Response:
+        self.cartesian_path_request = GetCartesianPath.Request()
+        self.cartesian_path_request.header.frame_id = \
+            self.arm_base_link
+        # self.kinematic_path_request.start_state = "Ignored"
+        self.cartesian_path_request.group_name = self.arm_group_name
+        self.cartesian_path_request.link_name = self.arm_end_effector
+        self.cartesian_path_request.waypoints = []
+        self.cartesian_path_request.max_step = 0.01
+        self.cartesian_path_request.jump_threshold = 0.5
+        # self.cartesian_path_request.prismatic_jump_threshold = 0.0
+        # self.cartesian_path_request.revolute_jump_threshold = 0.0
+        self.cartesian_path_request.avoid_collisions = True
+        # self.cartesian_path_request.path_constraints = "Ignored"
+
+    def plan_cartesian_path(self, waypoints: Sequence[Pose], constraints: Constraints, attached_collision_objects = []) -> GetCartesianPath.Response:
         """
         Call `compute_cartesian_path` service.
         """
-        # TODO
-        pass
+        
+        self.cartesian_path_request.header.stamp = \
+            self._clock.now().to_msg()
+
+        # Stamp message with current time
+        clock_time_now_msg = self._clock.now().to_msg()
+        for position_constraint in constraints.position_constraints:
+            position_constraint.header.stamp = clock_time_now_msg
+        for orientation_constraint in constraints.orientation_constraints:
+            orientation_constraint.header.stamp = clock_time_now_msg
+        
+        self.cartesian_path_request.path_constraints = constraints
+        self.cartesian_path_request.waypoints = waypoints
+        # set robot state
+        self.cartesian_path_request.start_state.joint_state = self.get_joint_state()
+        self.cartesian_path_request.start_state.attached_collision_objects = \
+            attached_collision_objects
+
+        self.plan_cartesian_path_client.wait_for_service()
+        response = self.plan_cartesian_path_client.call(
+            self.cartesian_path_request)
+        self.motion_plan_ = response.solution
+
+        return response
 
     # gripper
     def init_gripper(self):
