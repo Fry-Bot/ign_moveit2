@@ -131,7 +131,8 @@ class MoveIt2Interface(Node):
                               "wrist_1_link",
                               "wrist_2_link",
                               "wrist_3_link",
-                              "tool0"]
+                              "tool0",
+                              "gripper"]
             self.arm_base_link = self.arm_links[0]
             self.arm_end_effector = self.arm_links[-1]
             # Gripper
@@ -472,10 +473,10 @@ class MoveIt2Interface(Node):
             attached_collision_objects
 
         # # set trajectory constraints
-        if reference_trajectories is not None:
-            self.kinematic_path_request.motion_plan_request.reference_trajectories = reference_trajectories
-        else:
-            self.kinematic_path_request.motion_plan_request.reference_trajectories = None
+        # if reference_trajectories is not None:
+        #     self.kinematic_path_request.motion_plan_request.reference_trajectories = reference_trajectories
+        # else:
+        #     self.kinematic_path_request.motion_plan_request.reference_trajectories = None
         self.plan_kinematic_path_client.wait_for_service()
         response = self.plan_kinematic_path_client.call(
             self.kinematic_path_request)
