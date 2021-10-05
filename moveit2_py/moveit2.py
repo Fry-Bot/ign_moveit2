@@ -215,7 +215,7 @@ class MoveIt2Interface(Node):
                 robot_traj = RobotTrajectory()
                 robot_traj.joint_trajectory = trajectory
                 goal.trajectory = robot_traj
-                self.execute_trajectory_client.send_goal_async(goal)
+                return self.execute_trajectory_client.send_goal_async(goal)
         elif isinstance(trajectory, RobotTrajectory):
             if is_gripper and self.use_separate_gripper_controller:
                 self.gripper_trajectory_pub.publish(
@@ -224,11 +224,14 @@ class MoveIt2Interface(Node):
                 self.joint_trajectory_pub.publish(trajectory.joint_trajectory)
                 goal = ExecuteTrajectory.Goal()
                 goal.trajectory = trajectory
-                self.execute_trajectory_client.send_goal_async(goal)
+                return self.execute_trajectory_client.send_goal_async(goal)
         else:
             raise Exception("Invalid type passed into pub_trajectory()")
 
-    def execute(self, joint_trajectory=None, is_gripper=False) -> bool:
+    def get_trajectory_result(self, goal_handle):
+        return goal_handle.get_result_async()
+
+    async def execute(self, joint_trajectory=None, is_gripper=False, wait_for_result=False) -> bool:
         """
         Execute last planned motion plan, or the `joint_trajectory` specified as argument.
         """
@@ -248,7 +251,9 @@ class MoveIt2Interface(Node):
         # Reset joint progress
         self.joint_progress = 0.0
 
-        self.pub_trajectory(plan, is_gripper=is_gripper)
+        goal = await self.pub_trajectory(plan, is_gripper=is_gripper)
+        if wait_for_result:
+            result = await self.get_trajectory_result(goal)
         return True
 
     def move_to_joint_state(self, joint_state,
@@ -294,6 +299,8 @@ class MoveIt2Interface(Node):
         while not self.execute_trajectory_client.wait_for_server(timeout_sec=1.0):
             self.get_logger().info(
                 "Server [execute_trajectory] not currently available, waiting...")
+
+                
     # compute_fk
     def init_compute_fk(self):
         """
@@ -444,7 +451,7 @@ class MoveIt2Interface(Node):
 
     def plan_kinematic_path(self,
                             allowed_planning_time=5.0,
-                            num_planning_attempts=10, attached_collision_objects = [], reference_trajectories = None) -> GetMotionPlan.Response:
+                            num_planning_attempts=10, attached_collision_objects = [], path_constraints = None) -> GetMotionPlan.Response:
         """
         Call `plan_kinematic_path` service, with goal set using either `set_joint_goal()`,
         `set_position_goal()`, `set_orientation_goal()` or `set_pose_goal()`.
@@ -472,6 +479,19 @@ class MoveIt2Interface(Node):
         self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = \
             attached_collision_objects
 
+        if(path_constraints is not None):
+            # oc = OrientationConstraint()
+            # oc.link_name = "gripper"
+            # oc.header.frame_id = self.arm_base_link
+            # oc.orientation = orientation
+            # oc.parameterization = OrientationConstraint.XYZ_EULER_ANGLES;
+            # oc.absolute_x_axis_tolerance = math.radians(10);
+            # oc.absolute_y_axis_tolerance = math.radians(10);
+            # oc.absolute_z_axis_tolerance = math.radians(360);
+            # oc.weight = 1.0
+
+
+            self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
         # # set trajectory constraints
         # if reference_trajectories is not None:
         #     self.kinematic_path_request.motion_plan_request.reference_trajectories = reference_trajectories
