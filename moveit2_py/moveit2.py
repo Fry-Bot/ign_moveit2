@@ -29,11 +29,13 @@ import math
 
 class MoveIt2Interface(Node):
 
-    def __init__(self, separate_gripper_controller: bool = False, use_sim_time: bool = True, node_name: str = 'ign_moveit2_py', robot_model: str = 'tm12'):
+    def __init__(self, separate_gripper_controller: bool = False, use_sim_time: bool = True, node_name: str = 'ign_moveit2_py'):
         """
         robot_model - 'panda' and 'ur5_rg2' are supported
         """
         super().__init__(node_name)
+        self.declare_parameter('robot_model', 'tm12')
+        robot_model = self.get_parameter('robot_model').get_parameter_value().string_value
         self.set_parameters([Parameter('use_sim_time',
                                        type_=Parameter.Type.BOOL,
                                        value=use_sim_time)])
