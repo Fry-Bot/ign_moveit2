@@ -76,7 +76,8 @@ class MoveIt2Interface(Node):
                               "panda_link5",
                               "panda_link6",
                               "panda_link7",
-                              "panda_link8"]
+                              "panda_link8",
+                              "gripper"]
             self.arm_base_link = self.arm_links[0]
             self.arm_end_effector = self.arm_links[-1]
             # Gripper
@@ -124,7 +125,8 @@ class MoveIt2Interface(Node):
                                "joint_4",
                                "joint_5",
                                "joint_6"]
-            self.arm_links = ["base_link",
+            self.arm_links = ["slider_slider",
+                              "base_link",
                               "shoulder_1_link",
                               "arm_1_link",
                               "arm_2_link",
@@ -287,7 +289,7 @@ class MoveIt2Interface(Node):
         """
 
         joint_trajectory = JointTrajectory()
-        joint_trajectory.header.frame_id = self.arm_base_link
+        joint_trajectory.header.frame_id = "world" # self.arm_base_link
         joint_trajectory.joint_names = self.arm_joints
         point = JointTrajectoryPoint()
         point.positions = joint_positions
@@ -313,7 +315,7 @@ class MoveIt2Interface(Node):
                 "Service [compute_fk] not currently available, waiting...")
 
         self.fk_request = GetPositionFK.Request()
-        self.fk_request.header.frame_id = self.arm_base_link
+        self.fk_request.header.frame_id = "world" #self.arm_base_link
         # self.fk_request.header.stamp = "Set during request"
         # self.fk_request.fk_link_names = "Set during request"
         # self.fk_request.robot_state.joint_state = "Set during request"
@@ -360,8 +362,8 @@ class MoveIt2Interface(Node):
         self.ik_request.ik_request.robot_state.is_diff = False
         # self.ik_request.ik_request.constraints = "Set during request OR Ignored"
         self.ik_request.ik_request.avoid_collisions = True
-        # self.ik_request.ik_request.ik_link_name = "Ignored"
-        self.ik_request.ik_request.pose_stamped.header.frame_id = self.arm_base_link
+        self.ik_request.ik_request.ik_link_name = self.arm_end_effector #"Ignored"
+        self.ik_request.ik_request.pose_stamped.header.frame_id = "world" # self.arm_base_link
         # self.ik_request.ik_request.pose_stamped.header.stamp = "Set during request"
         # self.ik_request.ik_request.pose_stamped.pose = "Set during request"
         # self.ik_request.ik_request.ik_link_names = "Ignored"
@@ -384,7 +386,7 @@ class MoveIt2Interface(Node):
         self.ik_request.ik_request.pose_stamped.pose = pose
 
         self.ik_request.ik_request.pose_stamped.header.stamp = self._clock.now().to_msg()
-
+        self.get_logger().info("Calling IK service " + str(self.ik_request))
         self.compute_ik_client.wait_for_service()
         return self.compute_ik_client.call(self.ik_request)
 
@@ -402,15 +404,15 @@ class MoveIt2Interface(Node):
 
         self.kinematic_path_request = GetMotionPlan.Request()
         self.kinematic_path_request.motion_plan_request.workspace_parameters.header.frame_id = \
-            self.arm_base_link
+            "world" #self.arm_base_link
         # self.kinematic_path_request.motion_plan_request.workspace_parameters.header.stamp = \
         # "Set during request"
-        # self.kinematic_path_request.motion_plan_request.workspace_parameters.min_corner.x = -0.855
-        # self.kinematic_path_request.motion_plan_request.workspace_parameters.min_corner.y = -0.855
-        # self.kinematic_path_request.motion_plan_request.workspace_parameters.min_corner.z = -0.36
-        # self.kinematic_path_request.motion_plan_request.workspace_parameters.max_corner.x = 0.855
-        # self.kinematic_path_request.motion_plan_request.workspace_parameters.max_corner.y = 0.855
-        # self.kinematic_path_request.motion_plan_request.workspace_parameters.max_corner.z = 1.19
+        self.kinematic_path_request.motion_plan_request.workspace_parameters.min_corner.x = 0.0
+        self.kinematic_path_request.motion_plan_request.workspace_parameters.min_corner.y = 0.0
+        self.kinematic_path_request.motion_plan_request.workspace_parameters.min_corner.z = 0.0
+        self.kinematic_path_request.motion_plan_request.workspace_parameters.max_corner.x = 2.4
+        self.kinematic_path_request.motion_plan_request.workspace_parameters.max_corner.y = 6.0
+        self.kinematic_path_request.motion_plan_request.workspace_parameters.max_corner.z = 2.4
         # self.kinematic_path_request.motion_plan_request.start_state = "Ignored"
         self.kinematic_path_request.motion_plan_request.goal_constraints = \
             [Constraints()]
@@ -451,7 +453,7 @@ class MoveIt2Interface(Node):
 
     def plan_kinematic_path(self,
                             allowed_planning_time=5.0,
-                            num_planning_attempts=10, attached_collision_objects = [], path_constraints = None) -> GetMotionPlan.Response:
+                            num_planning_attempts=10, attached_collision_objects = [], path_constraints = None, joint_state = None) -> GetMotionPlan.Response:
         """
         Call `plan_kinematic_path` service, with goal set using either `set_joint_goal()`,
         `set_position_goal()`, `set_orientation_goal()` or `set_pose_goal()`.
@@ -475,22 +477,14 @@ class MoveIt2Interface(Node):
             for orientation_constraint in contraints.orientation_constraints:
                 orientation_constraint.header.stamp = clock_time_now_msg
         # set robot state
-        self.kinematic_path_request.motion_plan_request.start_state.joint_state = self.get_joint_state()
-        self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = \
-            attached_collision_objects
+        # self.kinematic_path_request.motion_plan_request.start_state.is_diff = True
+        if joint_state == None:
+            self.kinematic_path_request.motion_plan_request.start_state.joint_state = self.get_joint_state()
+        else:
+            self.kinematic_path_request.motion_plan_request.start_state.joint_state = joint_state
+        self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
 
         if(path_constraints is not None):
-            # oc = OrientationConstraint()
-            # oc.link_name = "gripper"
-            # oc.header.frame_id = self.arm_base_link
-            # oc.orientation = orientation
-            # oc.parameterization = OrientationConstraint.XYZ_EULER_ANGLES;
-            # oc.absolute_x_axis_tolerance = math.radians(10);
-            # oc.absolute_y_axis_tolerance = math.radians(10);
-            # oc.absolute_z_axis_tolerance = math.radians(360);
-            # oc.weight = 1.0
-
-
             self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
         # # set trajectory constraints
         # if reference_trajectories is not None:
@@ -550,7 +544,7 @@ class MoveIt2Interface(Node):
             frame = self.arm_base_link
 
         position_constraint = PositionConstraint()
-        position_constraint.header.frame_id = frame
+        position_constraint.header.frame_id = "world" #frame
         position_constraint.link_name = self.arm_end_effector
         position_constraint.constraint_region.primitive_poses.append(Pose())
         position_constraint.constraint_region.primitive_poses[0].position.x = float(
@@ -579,7 +573,7 @@ class MoveIt2Interface(Node):
             frame = self.arm_end_effector
 
         orientation_constraint = OrientationConstraint()
-        orientation_constraint.header.frame_id = self.arm_base_link
+        orientation_constraint.header.frame_id = "world" # self.arm_base_link
         orientation_constraint.link_name = frame
         orientation_constraint.orientation.x = float(quaternion[0])
         orientation_constraint.orientation.y = float(quaternion[1])
@@ -620,7 +614,7 @@ class MoveIt2Interface(Node):
 
         self.cartesian_path_request = GetCartesianPath.Request()
         self.cartesian_path_request.header.frame_id = \
-            self.arm_base_link
+            "world" #self.arm_base_link
         # self.kinematic_path_request.start_state = "Ignored"
         self.cartesian_path_request.group_name = self.arm_group_name
         self.cartesian_path_request.link_name = self.arm_end_effector
@@ -675,7 +669,7 @@ class MoveIt2Interface(Node):
 
         self.gripper_path_request = GetMotionPlan.Request()
         self.gripper_path_request.motion_plan_request.workspace_parameters.header.frame_id = \
-            self.arm_base_link
+            "world" #self.arm_base_link
         # self.gripper_path_request.motion_plan_request.workspace_parameters.header.stamp = \
         # "Set during request"
         self.gripper_path_request.motion_plan_request.workspace_parameters.min_corner.x = -0.855
@@ -810,7 +804,7 @@ class MoveIt2Interface(Node):
             joint_trajectory.joint_names.append(gripper_joint)
 
         joint_trajectory.header.stamp = self._clock.now().to_msg()
-        joint_trajectory.header.frame_id = self.arm_base_link
+        joint_trajectory.header.frame_id = "world"# self.arm_base_link
 
         for i in range(2):
             joint_trajectory.points.append(JointTrajectoryPoint())
