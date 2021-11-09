@@ -20,9 +20,9 @@ from geometry_msgs.msg import Pose, Quaternion
 from shape_msgs.msg import SolidPrimitive
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint, TrajectoryConstraints,PositionIKRequest, RobotTrajectory
+from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint, TrajectoryConstraints,PositionIKRequest, RobotTrajectory, MotionSequenceItem, MotionSequenceRequest, MotionPlanRequest, RobotState
 from moveit_msgs.srv import GetPositionIK, GetPositionFK, GetMotionPlan, GetCartesianPath
-from moveit_msgs.action import MoveGroup, ExecuteTrajectory
+from moveit_msgs.action import MoveGroup, ExecuteTrajectory, HybridPlanning
 from action_msgs.msg import GoalStatus
 import math
 
@@ -49,6 +49,10 @@ class MoveIt2Interface(Node):
         self.init_gripper()
         self.init_execute_trajectory()
         self.get_logger().info("ign_moveit2_py initialised successfuly")
+
+        # Hybrid planning
+        self.hp_action_client = ActionClient(self, HybridPlanning, 'run_hybrid_planning')
+        self.hp_action_client.wait_for_server(timeout_sec=20.0)
 
     def log(self, message):
         self.get_logger().info(message)
@@ -388,7 +392,6 @@ class MoveIt2Interface(Node):
         self.ik_request.ik_request.pose_stamped.pose = pose
 
         self.ik_request.ik_request.pose_stamped.header.stamp = self._clock.now().to_msg()
-        self.get_logger().info("Calling IK service " + str(self.ik_request))
         self.compute_ik_client.wait_for_service()
         return self.compute_ik_client.call(self.ik_request)
 
@@ -500,6 +503,47 @@ class MoveIt2Interface(Node):
         self.motion_plan_ = response.motion_plan_response.trajectory
 
         return response
+
+    async def plan_hybrid_path(self, wait_for_result=False, attached_collision_objects = [], path_constraints = None):
+        
+        goal_motion_request = MotionPlanRequest()
+        goal_motion_request.group_name = self.arm_group_name
+        goal_motion_request.num_planning_attempts = 10
+        goal_motion_request.allowed_planning_time = 2.0
+        goal_motion_request.max_velocity_scaling_factor = 0.1
+        goal_motion_request.max_acceleration_scaling_factor = 0.1
+        goal_motion_request.max_cartesian_speed = 0.1
+        goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
+        # goal_motion_request.planner_id = "ompl"
+        goal_motion_request.pipeline_id = "move_group"
+        goal_motion_request.goal_constraints = []
+        goal_motion_request.goal_constraints = self.kinematic_path_request.motion_plan_request.goal_constraints
+        # goal_motion_request.start_state.joint_state = self.get_joint_state()
+        # goal_motion_request.start_state.attached_collision_objects = attached_collision_objects
+        sequence_item = MotionSequenceItem()
+        sequence_item.req = goal_motion_request
+        sequence_item.blend_radius = 0.0
+
+        sequence_request = MotionSequenceRequest()
+        sequence_request.items.append(sequence_item)
+
+
+        goal_action_request = HybridPlanning.Goal()
+        goal_action_request.planning_group = self.arm_group_name
+        goal_action_request.motion_sequence = sequence_request
+
+        # goalRequest = HybridPlanning.Request()
+        # goalRequest. = goal_action_request
+        goal = await self.hp_action_client.send_goal_async(goal_action_request)
+        # self.motion_plan_ = goal.motion_plan_response.trajectory
+        # result = await self.get_trajectory_result(goal)
+        # self.get_logger().info(str(result))
+        self.clear_goal_constraints()
+        if wait_for_result:
+            result = await goal.get_result_async()
+            self.get_logger().info(str(result))
+        
+        return goal
 
     def clear_goal_constraints(self):
         """
