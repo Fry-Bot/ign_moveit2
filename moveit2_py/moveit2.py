@@ -22,7 +22,7 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint, TrajectoryConstraints,PositionIKRequest, RobotTrajectory, MotionSequenceItem, MotionSequenceRequest, MotionPlanRequest, RobotState
 from moveit_msgs.srv import GetPositionIK, GetPositionFK, GetMotionPlan, GetCartesianPath
-from moveit_msgs.action import MoveGroup, ExecuteTrajectory, HybridPlanning
+from moveit_msgs.action import MoveGroup, ExecuteTrajectory #, HybridPlanner
 from action_msgs.msg import GoalStatus
 import math
 
@@ -51,8 +51,8 @@ class MoveIt2Interface(Node):
         self.get_logger().info("ign_moveit2_py initialised successfuly")
 
         # Hybrid planning
-        self.hp_action_client = ActionClient(self, HybridPlanning, 'run_hybrid_planning')
-        self.hp_action_client.wait_for_server(timeout_sec=20.0)
+        # self.hp_action_client = ActionClient(self, HybridPlanner, 'run_hybrid_planning')
+        # self.hp_action_client.wait_for_server(timeout_sec=20.0)
 
     def log(self, message):
         self.get_logger().info(message)
@@ -112,6 +112,34 @@ class MoveIt2Interface(Node):
                               "wrist_2_link",
                               "wrist_3_link",
                               "tool0"]
+            self.arm_base_link = self.arm_links[0]
+            self.arm_end_effector = self.arm_links[-1]
+            # Gripper
+            self.gripper_group_name = "rg2"
+            self.gripper_joints = ["rg2_finger_joint1",
+                                   "rg2_finger_joint2"]
+            self.gripper_max_width = 1.0471976
+            self.gripper_max_speed = 1.57
+            self.gripper_max_force = 10.6
+        elif 'ur10e' == robot_model:
+            self.robot_group_name = "ur10e"
+            # Arm
+            self.arm_group_name = "manipulator"
+            self.arm_joints = ["elbow_joint",
+                               "shoulder_lift_joint",
+                               "shoulder_pan_joint",
+                               "wrist_1_joint",
+                               "wrist_2_joint",
+                               "wrist_3_joint"]
+            self.arm_links = ["base_link",
+                              "shoulder_link",
+                              "upper_arm_link",
+                              "forearm_link",
+                              "wrist_1_link",
+                              "wrist_2_link",
+                              "wrist_3_link",
+                              "tool0",
+                              "gripper"]
             self.arm_base_link = self.arm_links[0]
             self.arm_end_effector = self.arm_links[-1]
             # Gripper
@@ -489,8 +517,8 @@ class MoveIt2Interface(Node):
             self.kinematic_path_request.motion_plan_request.start_state.joint_state = joint_state
         self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
 
-        if(path_constraints is not None):
-            self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
+        # if(path_constraints is not None):
+        #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
         # # set trajectory constraints
         # if reference_trajectories is not None:
         #     self.kinematic_path_request.motion_plan_request.reference_trajectories = reference_trajectories
@@ -505,45 +533,56 @@ class MoveIt2Interface(Node):
         return response
 
     async def plan_hybrid_path(self, wait_for_result=False, attached_collision_objects = [], path_constraints = None):
+        # TEMP DISABLED
+        # goal_motion_request = MotionPlanRequest()
+        # goal_motion_request.group_name = self.arm_group_name
+        # goal_motion_request.num_planning_attempts = 10
+        # goal_motion_request.allowed_planning_time = 2.0
+        # goal_motion_request.max_velocity_scaling_factor = 0.1
+        # goal_motion_request.max_acceleration_scaling_factor = 0.1
+        # goal_motion_request.max_cartesian_speed = 0.1
+        # goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
+        # goal_motion_request.workspace_parameters.min_corner.x = 0.0
+        # goal_motion_request.workspace_parameters.max_corner.z = 2.4
+        # goal_motion_request.workspace_parameters.min_corner.z = 0.0
+        # goal_motion_request.workspace_parameters.max_corner.x = 2.4
+        # goal_motion_request.workspace_parameters.max_corner.y = 6.0
+        # goal_motion_request.workspace_parameters.min_corner.y = 0.0
+        # # goal_motion_request.planner_id = "BiTRRTkConfigDefault"
+        # # goal_motion_request.pipeline_id = "move_group"
+        # goal_motion_request.goal_constraints = []
+        # goal_motion_request.goal_constraints = self.kinematic_path_request.motion_plan_request.goal_constraints
+        # # goal_motion_request.start_state.joint_state = self.get_joint_state()
+        # # goal_motion_request.start_state.attached_collision_objects = attached_collision_objects
+        # sequence_item = MotionSequenceItem()
+        # sequence_item.req = goal_motion_request
+        # sequence_item.blend_radius = 0.0
+
+        # sequence_request = MotionSequenceRequest()
+        # sequence_request.items.append(sequence_item)
+
+
+        # goal_action_request = HybridPlanner.Goal()
+        # goal_action_request.planning_group = self.arm_group_name
+        # goal_action_request.motion_sequence = sequence_request
+
+        # # goalRequest = HybridPlanning.Request()
+        # # goalRequest. = goal_action_request
+        # goal = await self.hp_action_client.send_goal_async(goal_action_request, self.feedback_callback)
+        # # self.motion_plan_ = goal.motion_plan_response.trajectory
+        # # result = await self.get_trajectory_result(goal)
+        # # self.get_logger().info(str(result))
+        # self.get_logger().info("goal: " + str(goal))
+        # self.clear_goal_constraints()
+        # if wait_for_result:
+        #     result = await goal.get_result_async()
+        #     self.get_logger().info(str(result))
         
-        goal_motion_request = MotionPlanRequest()
-        goal_motion_request.group_name = self.arm_group_name
-        goal_motion_request.num_planning_attempts = 10
-        goal_motion_request.allowed_planning_time = 2.0
-        goal_motion_request.max_velocity_scaling_factor = 0.1
-        goal_motion_request.max_acceleration_scaling_factor = 0.1
-        goal_motion_request.max_cartesian_speed = 0.1
-        goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
-        # goal_motion_request.planner_id = "ompl"
-        goal_motion_request.pipeline_id = "move_group"
-        goal_motion_request.goal_constraints = []
-        goal_motion_request.goal_constraints = self.kinematic_path_request.motion_plan_request.goal_constraints
-        # goal_motion_request.start_state.joint_state = self.get_joint_state()
-        # goal_motion_request.start_state.attached_collision_objects = attached_collision_objects
-        sequence_item = MotionSequenceItem()
-        sequence_item.req = goal_motion_request
-        sequence_item.blend_radius = 0.0
+        # return goal
+        return
 
-        sequence_request = MotionSequenceRequest()
-        sequence_request.items.append(sequence_item)
-
-
-        goal_action_request = HybridPlanning.Goal()
-        goal_action_request.planning_group = self.arm_group_name
-        goal_action_request.motion_sequence = sequence_request
-
-        # goalRequest = HybridPlanning.Request()
-        # goalRequest. = goal_action_request
-        goal = await self.hp_action_client.send_goal_async(goal_action_request)
-        # self.motion_plan_ = goal.motion_plan_response.trajectory
-        # result = await self.get_trajectory_result(goal)
-        # self.get_logger().info(str(result))
-        self.clear_goal_constraints()
-        if wait_for_result:
-            result = await goal.get_result_async()
-            self.get_logger().info(str(result))
-        
-        return goal
+    def feedback_callback(self, feedback):
+        self.get_logger().info('Feedback received: %s' % feedback)
 
     def clear_goal_constraints(self):
         """
@@ -666,7 +705,7 @@ class MoveIt2Interface(Node):
         self.cartesian_path_request.link_name = self.arm_end_effector
         self.cartesian_path_request.waypoints = []
         self.cartesian_path_request.max_step = 0.01
-        self.cartesian_path_request.jump_threshold = 0.5
+        self.cartesian_path_request.jump_threshold = 5.0 #0.01
         # self.cartesian_path_request.prismatic_jump_threshold = 0.0
         # self.cartesian_path_request.revolute_jump_threshold = 0.0
         self.cartesian_path_request.avoid_collisions = True
