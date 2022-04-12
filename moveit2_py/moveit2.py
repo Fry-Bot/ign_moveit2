@@ -556,7 +556,7 @@ class MoveIt2Interface(Node):
             # goal_motion_request.planner_id = "geometric::BiTRRT"
             # goal_motion_request.pipeline_id = "ompl"
             # goal_motion_request.planner_id = "ompl" -=> no planner name => takes last groupname
-            goal_motion_request.pipeline_id = "ompl"
+            goal_motion_request.pipeline_id = "move_group"
             goal_motion_request.goal_constraints = [goal]
             for contraints in goal_motion_request.goal_constraints:
                 self.get_logger().info("Constraint: " + str(contraints))
