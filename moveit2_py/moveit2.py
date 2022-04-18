@@ -51,7 +51,7 @@ class MoveIt2Interface(Node):
 
         # Hybrid planning
         self.hp_action_client = ActionClient(self, HybridPlanner, '/hybrid_planning/run_hybrid_planning')
-        self.hp_action_client.wait_for_server(timeout_sec=20.0)
+        self.hp_action_client.wait_for_server(timeout_sec=2.0)
         # pilz_industrial_motion_planner
         self.movegroup_action_client = ActionClient(self, MoveGroupSequence, '/sequence_move_group')
         # self.movegroup_action_client.wait_for_server(timeout_sec=20.0)
