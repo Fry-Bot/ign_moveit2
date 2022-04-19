@@ -50,7 +50,7 @@ class MoveIt2Interface(Node):
         self.init_execute_trajectory()
 
         # Hybrid planning
-        self.hp_action_client = ActionClient(self, HybridPlanner, '/hybrid_planning/run_hybrid_planning')
+        self.hp_action_client = ActionClient(self, HybridPlanner, '/run_hybrid_planning')
         self.hp_action_client.wait_for_server(timeout_sec=2.0)
         # pilz_industrial_motion_planner
         self.movegroup_action_client = ActionClient(self, MoveGroupSequence, '/sequence_move_group')
@@ -547,16 +547,16 @@ class MoveIt2Interface(Node):
             goal_motion_request.max_acceleration_scaling_factor = 0.1
             # goal_motion_request.max_cartesian_speed = 0.1
             # goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
-            # goal_motion_request.workspace_parameters.min_corner.x = 0.0
-            # goal_motion_request.workspace_parameters.max_corner.z = 2.4
-            # goal_motion_request.workspace_parameters.min_corner.z = 0.0
-            # goal_motion_request.workspace_parameters.max_corner.x = 2.4
-            # goal_motion_request.workspace_parameters.max_corner.y = 6.0
-            # goal_motion_request.workspace_parameters.min_corner.y = 0.0
+            goal_motion_request.workspace_parameters.min_corner.x = 0.01
+            goal_motion_request.workspace_parameters.max_corner.z = 2.4
+            goal_motion_request.workspace_parameters.min_corner.z = 0.01
+            goal_motion_request.workspace_parameters.max_corner.x = 2.4
+            goal_motion_request.workspace_parameters.max_corner.y = 6.0
+            goal_motion_request.workspace_parameters.min_corner.y = 0.01
             # goal_motion_request.planner_id = "geometric::BiTRRT"
-            # goal_motion_request.pipeline_id = "ompl"
-            # goal_motion_request.planner_id = "ompl" -=> no planner name => takes last groupname
-            goal_motion_request.pipeline_id = "move_group"
+            goal_motion_request.pipeline_id = "ompl"
+            # goal_motion_request.planner_id = "ompl" # -=> no planner name => takes last groupname
+            # goal_motion_request.pipeline_id = "move_group"
             goal_motion_request.goal_constraints = [goal]
             for contraints in goal_motion_request.goal_constraints:
                 self.get_logger().info("Constraint: " + str(contraints))
@@ -575,11 +575,14 @@ class MoveIt2Interface(Node):
 
         goal_action_request = HybridPlanner.Goal()
         goal_action_request.planning_group = self.arm_group_name
+        # goal_action_request.
         goal_action_request.motion_sequence = sequence_request
 
         # goalRequest = HybridPlanning.Request()
         # goalRequest. = goal_action_request
+        self.get_logger().info("Planning hybrid path" + str(goal_action_request))
         goal = await self.hp_action_client.send_goal_async(goal_action_request, self.feedback_callback)
+        
         # self.motion_plan_ = goal.motion_plan_response.trajectory
         # result = await self.get_trajectory_result(goal)
         # self.get_logger().info(str(result))
