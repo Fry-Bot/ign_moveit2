@@ -271,7 +271,7 @@ class MoveIt2Interface(Node):
     def get_trajectory_result(self, goal_handle):
         return goal_handle.get_result_async()
 
-    async def execute(self, joint_trajectory=None, is_gripper=False, wait_for_result=False) -> bool:
+    async def execute(self, joint_trajectory=None, is_gripper=False, wait_for_result=False, speed_percentage = 100) -> bool:
         """
         Execute last planned motion plan, or the `joint_trajectory` specified as argument.
         """
@@ -287,6 +287,11 @@ class MoveIt2Interface(Node):
             self.get_logger().warn(
                 "Cannot execute motion plan because it does not contain any trajectory points")
             return False
+
+        for point in plan.points:
+            sec = point.time_from_start.sec / speed_percentage * 100.0
+            point.time_from_start.sec = int(math.floor(sec))
+            point.time_from_start.nanosec = int(point.time_from_start.nanosec / speed_percentage * 100.0) + int((sec - int(math.floor(sec))) * 1000)
 
         # Reset joint progress
         self.joint_progress = 0.0
@@ -538,39 +543,53 @@ class MoveIt2Interface(Node):
 
     async def plan_hybrid_path(self, goal_constraints, wait_for_result=False, attached_collision_objects = [], path_constraints = None):
         sequence_request = MotionSequenceRequest()
-        for goal in goal_constraints:
-            goal_motion_request = MotionPlanRequest()
-            goal_motion_request.group_name = self.arm_group_name
-            goal_motion_request.num_planning_attempts = 10
-            goal_motion_request.allowed_planning_time = 2.0
-            goal_motion_request.max_velocity_scaling_factor = 0.1
-            goal_motion_request.max_acceleration_scaling_factor = 0.1
-            # goal_motion_request.max_cartesian_speed = 0.1
-            # goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
-            goal_motion_request.workspace_parameters.min_corner.x = 0.01
-            goal_motion_request.workspace_parameters.max_corner.z = 2.4
-            goal_motion_request.workspace_parameters.min_corner.z = 0.01
-            goal_motion_request.workspace_parameters.max_corner.x = 2.4
-            goal_motion_request.workspace_parameters.max_corner.y = 6.0
-            goal_motion_request.workspace_parameters.min_corner.y = 0.01
-            # goal_motion_request.planner_id = "geometric::BiTRRT"
-            goal_motion_request.pipeline_id = "ompl"
+        # single goal constrain with multiple position & orientation constraints
+
+        goal_motion_request = MotionPlanRequest()
+        goal_motion_request.group_name = self.arm_group_name
+        goal_motion_request.num_planning_attempts = 10
+        goal_motion_request.allowed_planning_time = 2.0
+        goal_motion_request.max_velocity_scaling_factor = 0.1
+        goal_motion_request.max_acceleration_scaling_factor = 0.1
+        # goal_motion_request.max_cartesian_speed = 0.1
+        # goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
+        goal_motion_request.workspace_parameters.min_corner.x = 0.01
+        goal_motion_request.workspace_parameters.max_corner.z = 2.4
+        goal_motion_request.workspace_parameters.min_corner.z = 0.01
+        goal_motion_request.workspace_parameters.max_corner.x = 2.4
+        goal_motion_request.workspace_parameters.max_corner.y = 6.0
+        goal_motion_request.workspace_parameters.min_corner.y = 0.01
+        # goal_motion_request.planner_id = "geometric::BiTRRT"
+        goal_motion_request.planner_id = "RRTConnectkConfigDefault"
+        goal_motion_request.pipeline_id =  "ompl"
             # goal_motion_request.planner_id = "ompl" # -=> no planner name => takes last groupname
             # goal_motion_request.pipeline_id = "move_group"
-            goal_motion_request.goal_constraints = [goal]
-            for contraints in goal_motion_request.goal_constraints:
-                self.get_logger().info("Constraint: " + str(contraints))
+        goal_motion_request.goal_constraints = goal_constraints
+        #  [Constraints()]
+        # for goal in goal_constraints:
+        #     position_constraint = PositionConstraint()
+        #     position_constraint.target_point_offset.x = goal.position.x
+        #     position_constraint.target_point_offset.y = goal.position.y
+        #     position_constraint.target_point_offset.z = goal.position.z
+        #     goal_motion_request.goal_constraints[0].position_constraints.push_back(position_constraint);
+
+        #     orientation_constraint = OrientationConstraint()
+        #     orientation_constraint.orientation = goal.orientation
+        #     goal_motion_request.goal_constraints[0].orientation_constraints.push_back(orientation_constraint)
+
+        for contraints in goal_motion_request.goal_constraints:
+            self.get_logger().info("Constraint: " + str(contraints))
             # goal_motion_request.start_state.joint_state = self.get_joint_state()
             # goal_motion_request.start_state.attached_collision_objects = attached_collision_objects
-            sequence_item = MotionSequenceItem()
-            sequence_item.req = goal_motion_request
-            if goal == goal_constraints[-1]:
-                sequence_item.blend_radius = 0.0 #0 for single goal
-            else:
-                sequence_item.blend_radius = 0.01
+        sequence_item = MotionSequenceItem()
+        sequence_item.req = goal_motion_request
+        # if goal == goal_constraints[-1]:
+        #     sequence_item.blend_radius = 0.0 #0 for single goal
+        # else:
+        #     sequence_item.blend_radius = 0.01
 
-            
-            sequence_request.items.append(sequence_item)
+        
+        sequence_request.items.append(sequence_item)
 
 
         goal_action_request = HybridPlanner.Goal()
