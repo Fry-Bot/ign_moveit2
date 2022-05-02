@@ -288,10 +288,12 @@ class MoveIt2Interface(Node):
                 "Cannot execute motion plan because it does not contain any trajectory points")
             return False
 
-        for point in plan.points:
-            sec = point.time_from_start.sec / speed_percentage * 100.0
-            point.time_from_start.sec = int(math.floor(sec))
-            point.time_from_start.nanosec = int(point.time_from_start.nanosec / speed_percentage * 100.0) + int((sec - int(math.floor(sec))) * 1000)
+        # current errors
+        if speed_percentage != 100.0:
+            for point in plan.points:
+                sec = point.time_from_start.sec / speed_percentage * 100.0
+                point.time_from_start.sec = int(math.floor(sec))
+                point.time_from_start.nanosec = int(point.time_from_start.nanosec / speed_percentage * 100.0) + int((sec - int(math.floor(sec))) * 1000)
 
         # Reset joint progress
         self.joint_progress = 0.0
