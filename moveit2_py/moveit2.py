@@ -25,8 +25,7 @@ from moveit_msgs.srv import GetPositionIK, GetPositionFK, GetMotionPlan, GetCart
 from moveit_msgs.action import MoveGroup, ExecuteTrajectory, HybridPlanner, MoveGroupSequence
 from action_msgs.msg import GoalStatus
 import math
-
-
+from control_msgs.msg import JointJog
 class MoveIt2Interface(Node):
 
     def __init__(self, separate_gripper_controller: bool = False, use_sim_time: bool = True, node_name: str = 'ign_moveit2_py'):
@@ -45,6 +44,7 @@ class MoveIt2Interface(Node):
         self.init_compute_fk()
         self.init_compute_ik()
         self.init_plan_kinematic_path()
+        self.init_plan_pilz_path()
         self.init_plan_cartesian_path()
         self.init_gripper()
         self.init_execute_trajectory()
@@ -55,8 +55,12 @@ class MoveIt2Interface(Node):
         # pilz_industrial_motion_planner
         self.movegroup_action_client = ActionClient(self, MoveGroupSequence, '/sequence_move_group')
         # self.movegroup_action_client.wait_for_server(timeout_sec=20.0)
-
+        self.jointJogPublisher = self.create_publisher(JointJog, '/servo_node/delta_joint_cmds', 10)
         self.get_logger().info("ign_moveit2_py initialised successfuly")
+        self.speed = 100.0
+
+    def get_speed(self):
+        return self.speed
 
     def log(self, message):
         self.get_logger().info(message)
@@ -97,7 +101,6 @@ class MoveIt2Interface(Node):
             self.gripper_max_width = 0.08
             self.gripper_max_speed = 0.2
             self.gripper_max_force = 20.0
-
         elif 'ur5_rg2' == robot_model:
             self.robot_group_name = "ur5_rg2"
             # Arm
@@ -271,7 +274,7 @@ class MoveIt2Interface(Node):
     def get_trajectory_result(self, goal_handle):
         return goal_handle.get_result_async()
 
-    async def execute(self, joint_trajectory=None, is_gripper=False, wait_for_result=False, speed_percentage = 100) -> bool:
+    async def execute(self, joint_trajectory=None, is_gripper=False, wait_for_result=False) -> bool:
         """
         Execute last planned motion plan, or the `joint_trajectory` specified as argument.
         """
@@ -288,13 +291,26 @@ class MoveIt2Interface(Node):
                 "Cannot execute motion plan because it does not contain any trajectory points")
             return False
 
-        # current errors
-        if speed_percentage != 100.0:
-            for point in plan.points:
-                sec = point.time_from_start.sec / speed_percentage * 100.0
-                point.time_from_start.sec = int(math.floor(sec))
-                point.time_from_start.nanosec = int(point.time_from_start.nanosec / speed_percentage * 100.0) + int((sec - int(math.floor(sec))) * 1000)
+        # # # current errors
+        # if self.speed < 100.0:
+        #     for point in plan.points:       
+        #         nano_sec = int(point.time_from_start.nanosec / self.speed * 100.0)
+        #         sec = int(point.time_from_start.sec / self.speed * 100.0) + int(math.floor(nano_sec / 1000000000))
+        #         nano_sec = int(nano_sec % 1000000000)
 
+        #         self.log("point from: " + str(point.time_from_start) + " to: " + str(sec)+ ":" + str((int( nano_sec + int((sec - int(math.floor(sec))) * 1000000000)))))
+        #         point.time_from_start.sec = int(math.floor(sec))
+        #         point.time_from_start.nanosec = nano_sec + int((sec - int(math.floor(sec))) * 1000000000)
+# # current errors
+        # if self.speed < 100.0:
+        #     for point in plan.points:       
+        #         nano_sec = int(point.time_from_start.nanosec / self.speed * 100.0)
+        #         sec = int(point.time_from_start.sec / self.speed * 100.0) + int(math.floor(nano_sec / 1000000000))
+        #         nano_sec = int(nano_sec % 1000000000)
+
+        #         self.log("point from: " + str(point.time_from_start) + " to: " + str(sec)+ ":" + str((int( nano_sec + int((sec - int(math.floor(sec))) * 1000000000)))))
+        #         point.time_from_start.sec = int(math.floor(sec))
+        #         point.time_from_start.na
         # Reset joint progress
         self.joint_progress = 0.0
 
@@ -302,6 +318,14 @@ class MoveIt2Interface(Node):
         if wait_for_result:
             result = await self.get_trajectory_result(goal)
         return True
+
+    def retime_trajectory(self, ref_state_in, traj_in, velocity_scaling_factor):
+        ser_ref_state_in = ref_state_in.to_msg() # conversions.msg_to_string(ref_state_in)
+        ser_traj_in = traj_in.to_msg() #conversions.msg_to_string(traj_in)
+        ser_traj_out = self._g.retime_trajectory(ser_ref_state_in, ser_traj_in, velocity_scaling_factor)
+
+    def set_speed(self, speedPercentage: str):
+        self.speed = int(speedPercentage) * 1.0
 
     def move_to_joint_state(self, joint_state,
                             set_position=True,
@@ -476,6 +500,40 @@ class MoveIt2Interface(Node):
             self.arm_end_effector
         self.kinematic_path_request.motion_plan_request.max_cartesian_speed = 0.0
 
+    def init_plan_pilz_path(self):
+        """
+        Initialise `plan_pilz_path` service.
+        """
+
+        self.pilz_path_request = GetMotionPlan.Request()
+        self.pilz_path_request.motion_plan_request.workspace_parameters.header.frame_id = \
+            "world" #self.arm_base_link
+        # self.pilz_path_request.motion_plan_request.workspace_parameters.header.stamp = \
+        # "Set during request"
+        self.pilz_path_request.motion_plan_request.workspace_parameters.min_corner.x = 0.0
+        self.pilz_path_request.motion_plan_request.workspace_parameters.min_corner.y = 0.0
+        self.pilz_path_request.motion_plan_request.workspace_parameters.min_corner.z = 0.0
+        self.pilz_path_request.motion_plan_request.workspace_parameters.max_corner.x = 2.4
+        self.pilz_path_request.motion_plan_request.workspace_parameters.max_corner.y = 6.0
+        self.pilz_path_request.motion_plan_request.workspace_parameters.max_corner.z = 2.4
+        # self.pilz_path_request.motion_plan_request.start_state = "Ignored"
+        self.pilz_path_request.motion_plan_request.goal_constraints = \
+            [Constraints()]
+        # self.pilz_path_request.motion_plan_request.path_constraints = "Ignored"
+        # self.pilz_path_request.motion_plan_request.trajectory_constraints = "Ignored"
+        # self.pilz_path_request.motion_plan_request.reference_trajectories = "Ignored"
+        # self.pilz_path_request.motion_plan_request.planner_id = "BiTRRT"
+        self.pilz_path_request.motion_plan_request.pipeline_id = "move_group"
+        self.pilz_path_request.motion_plan_request.group_name = self.arm_group_name
+        # self.pilz_path_request.motion_plan_request.num_planning_attempts = \
+        # "Set during request"
+        # self.pilz_path_request.motion_plan_request.allowed_planning_time = \
+        # "Set during request"
+        self.pilz_path_request.motion_plan_request.max_velocity_scaling_factor = 0.0
+        self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = 0.0
+        self.pilz_path_request.motion_plan_request.cartesian_speed_end_effector_link = \
+            self.arm_end_effector
+        self.pilz_path_request.motion_plan_request.max_cartesian_speed = 0.0
     def set_max_velocity(self, scaling_factor):
         """
         Set maximum velocity of joints as a factor of joint limits.
@@ -495,7 +553,26 @@ class MoveIt2Interface(Node):
         """
         self.kinematic_path_request.motion_plan_request.max_cartesian_speed = speed
 
-    def plan_kinematic_path(self,
+    def set_max_velocity_pilz(self, scaling_factor):
+        """
+        Set maximum velocity of joints as a factor of joint limits.
+        """
+        self.pilz_path_request.motion_plan_request.max_velocity_scaling_factor = scaling_factor
+
+    def set_max_acceleration_pilz(self, scaling_factor):
+        """
+        Set maximum acceleration of joints as a factor of joint limits.
+        """
+        self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = \
+            scaling_factor if scaling_factor < 1.0 else 0.0
+
+    def set_max_cartesian_speed_pilz(self, speed):
+        """
+        Set maximum cartesian speed of end effector.
+        """
+        self.pilz_path_request.motion_plan_request.max_cartesian_speed = speed
+
+    async def plan_kinematic_path(self,
                             allowed_planning_time=5.0,
                             num_planning_attempts=10, attached_collision_objects = [], path_constraints = None, joint_state = None) -> GetMotionPlan.Response:
         """
@@ -528,6 +605,7 @@ class MoveIt2Interface(Node):
             self.kinematic_path_request.motion_plan_request.start_state.joint_state = joint_state
         self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
 
+        self.kinematic_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed != 100 else 0.0
         # if(path_constraints is not None):
         #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
         # # set trajectory constraints
@@ -628,6 +706,14 @@ class MoveIt2Interface(Node):
         self.kinematic_path_request.motion_plan_request.goal_constraints = \
             [Constraints()]
 
+    def clear_goal_constraints_pilz(self):
+        """
+        Clear all goal constraints that were previously set.
+        Note that this function is called automatically after each `plan_kinematic_path()`.
+        """
+        self.pilz_path_request.motion_plan_request.goal_constraints = \
+            [Constraints()]
+
     def create_new_goal_constraint(self):
         """
         Create a new set of goal contraints that will be set together with the request. Each
@@ -648,7 +734,7 @@ class MoveIt2Interface(Node):
             joint_constraint.position = joint_positions[i]
             joint_constraint.tolerance_above = tolerance
             joint_constraint.tolerance_below = tolerance
-            joint_constraint.weight = weight
+            joint_constraint.weight = weightmax_cartesian_speed
 
             (joint_constraints.append(joint_constraint))
         return joint_constraints
@@ -672,6 +758,26 @@ class MoveIt2Interface(Node):
 
             (self.kinematic_path_request.motion_plan_request.goal_constraints[-1].
              joint_constraints.append(joint_constraint))
+    def set_joint_goal_pilz(self, joint_positions, tolerance=0.001, weight=1.0, joint_names=None):
+        """
+        Set goal position in joint space. With `joint_names` specified, `joint_positions` can be
+        defined for specific joints. Otherwise, first `n` joints defined in `init_robot()` will be
+        used, where `n` is the length of `joint_positions`.
+        """
+        if joint_names == None:
+            joint_names = self.arm_joints
+
+        for i in range(min(len(joint_positions), 6)):
+            joint_constraint = JointConstraint()
+            joint_constraint.joint_name = joint_names[i]
+            joint_constraint.position = joint_positions[i]
+            joint_constraint.tolerance_above = tolerance
+            joint_constraint.tolerance_below = tolerance
+            joint_constraint.weight = weight
+
+            (self.pilz_path_request.motion_plan_request.goal_constraints[-1].
+             joint_constraints.append(joint_constraint))
+
     def create_position_goal(self, position, tolerance=0.001, weight=1.0, frame=None):
         if frame == None:
             frame = self.arm_base_link
@@ -705,6 +811,15 @@ class MoveIt2Interface(Node):
         (self.kinematic_path_request.motion_plan_request.goal_constraints[-1].position_constraints
          .append(position_constraint))
 
+    def set_position_goal_pilz(self, position, tolerance=0.001, weight=1.0, frame=None):
+        """
+        Set goal position of `frame` in Cartesian space. Defaults to the end-effector `frame`.
+        """
+        position_constraint = self.create_position_goal(position, tolerance, weight, frame)
+
+        (self.pilz_path_request.motion_plan_request.goal_constraints[-1].position_constraints
+         .append(position_constraint))
+
     def create_orientation_goal(self, quaternion, tolerance=0.001, weight=1.0, frame=None):
         if frame == None:
             frame = self.arm_end_effector
@@ -732,6 +847,15 @@ class MoveIt2Interface(Node):
         (self.kinematic_path_request.motion_plan_request.goal_constraints[-1]
          .orientation_constraints.append(orientation_constraint))
 
+    def set_orientation_goal_pilz(self, quaternion, tolerance=0.001, weight=1.0, frame=None):
+        """
+        Set goal orientation of `frame`. Defaults to the end-effector `frame`.
+        """
+
+        orientation_constraint = self.create_orientation_goal(quaternion=quaternion,tolerance=tolerance,weight=weight,frame=frame)
+        (self.pilz_path_request.motion_plan_request.goal_constraints[-1]
+         .orientation_constraints.append(orientation_constraint))
+
     def set_pose_goal(self, position, quaternion,
                       tolerance_position=0.001, tolerance_orientation=0.001,
                       weight_position=1.0, weight_orientation=1.0,
@@ -743,6 +867,19 @@ class MoveIt2Interface(Node):
         self.set_position_goal(
             position, tolerance_position, weight_position, frame)
         self.set_orientation_goal(
+            quaternion, tolerance_orientation, weight_orientation, frame)
+
+    def set_pose_goal_pilz(self, position, quaternion,
+                      tolerance_position=0.001, tolerance_orientation=0.001,
+                      weight_position=1.0, weight_orientation=1.0,
+                      frame=None):
+        """
+        Set goal pose. This is direct combination of `set_position_goal()` and
+        `set_orientation_goal()`.
+        """
+        self.set_position_goal_pilz(
+            position, tolerance_position, weight_position, frame)
+        self.set_orientation_goal_pilz(
             quaternion, tolerance_orientation, weight_orientation, frame)
 
     # plan_cartesian_path
@@ -799,64 +936,69 @@ class MoveIt2Interface(Node):
         self.motion_plan_ = response.solution
 
         return response
+    def run_servo_to_joints(self, joint_positions):
+        joint_jog = JointJog()
+        joint_jog.header.stamp = self.get_clock().now().to_msg()
+        joint_jog.header.frame_id = "world"# self.arm_bas
+        joint_jog.joint_names = self.arm_joints
+        current_joint_state = self.get_joint_state()
+        joint_jog.duration = 1.0
+        # self.get_logger().info("Iterating")
+        for index, joint in enumerate(joint_jog.joint_names):
+            joint_jog.displacements.append(joint_positions[index] - current_joint_state.position[index])
+            joint_jog.velocities.append(10.0)
+            # self.get_logger().info("getting joint " + joint + ": " + str(joint_jog.displacements[index]))
+       
+        self.jointJogPublisher.publish(joint_jog)
 
 
-    async def plan_pilz_path(self, goal_constraints, attached_collision_objects = [], path_constraints = []) -> GetCartesianPath.Response:
+    async def plan_pilz_path(self, allowed_planning_time=5.0,
+                            num_planning_attempts=10, attached_collision_objects = [], path_constraints = None, joint_state = None) -> GetMotionPlan.Response:
         """
-        Call `compute_cartesian_path` service.
+        Call `plan_kinematic_path` service, with goal set using either `set_joint_goal()`,
+        `set_position_goal()`, `set_orientation_goal()` or `set_pose_goal()`.
         """
-        sequence_request = MotionSequenceRequest()
-        for goal in goal_constraints:
-            goal_motion_request = MotionPlanRequest()
-            goal_motion_request.group_name = self.arm_group_name
-            goal_motion_request.num_planning_attempts = 10
-            goal_motion_request.allowed_planning_time = 2.0
-            goal_motion_request.max_velocity_scaling_factor = 0.1
-            goal_motion_request.max_acceleration_scaling_factor = 0.1
 
-            # goal_motion_request.max_cartesian_speed = 0.1
-            # goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
-            # goal_motion_request.workspace_parameters.min_corner.x = 0.0
-            # goal_motion_request.workspace_parameters.max_corner.z = 2.4
-            # goal_motion_request.workspace_parameters.min_corner.z = 0.0
-            # goal_motion_request.workspace_parameters.max_corner.x = 2.4
-            # goal_motion_request.workspace_parameters.max_corner.y = 6.0
-            # goal_motion_request.workspace_parameters.min_corner.y = 0.0
-            # goal_motion_request.planner_id = "geometric::BiTRRT"
-            # goal_motion_request.pipeline_id = "ompl"
-            # goal_motion_request.planner_id = "ompl" -=> no planner name => takes last groupname
-            goal_motion_request.pipeline_id = "PTP"
-            goal_motion_request.goal_constraints = [goal]
-            # goal_motion_request.start_state.joint_state = self.get_joint_state()
-            # goal_motion_request.start_state.attached_collision_objects = attached_collision_objects
-            sequence_item = MotionSequenceItem()
-            sequence_item.req = goal_motion_request
-            if goal == goal_constraints[-1]:
-                sequence_item.blend_radius = 0.0 #0 for single goal
-            else:
-                sequence_item.blend_radius = 0.01
+        self.pilz_path_request.motion_plan_request.num_planning_attempts = \
+            num_planning_attempts
+        self.pilz_path_request.motion_plan_request.allowed_planning_time = \
+            allowed_planning_time
 
-            
-            sequence_request.items.append(sequence_item)
+        self.pilz_path_request.motion_plan_request.workspace_parameters.header.stamp = \
+            self._clock.now().to_msg()
+
+        # Stamp message with current time
+        clock_time_now_msg = self._clock.now().to_msg()
+        self.pilz_path_request.motion_plan_request.workspace_parameters.header.stamp = \
+            clock_time_now_msg
+        for contraints in self.pilz_path_request.motion_plan_request.goal_constraints:
+            for position_constraint in contraints.position_constraints:
+                position_constraint.header.stamp = clock_time_now_msg
+            for orientation_constraint in contraints.orientation_constraints:
+                orientation_constraint.header.stamp = clock_time_now_msg
+        # set robot state
+        # self.pilz_path_request.motion_plan_request.start_state.is_diff = True
+        if joint_state == None:
+            self.pilz_path_request.motion_plan_request.start_state.joint_state = self.get_joint_state()
+        else:
+            self.pilz_path_request.motion_plan_request.start_state.joint_state = joint_state
+        self.pilz_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
+        self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed != 100 else 0.0
+        # if(path_constraints is not None):
+        #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
+        # # set trajectory constraints
+        # if reference_trajectories is not None:
+        #     self.kinematic_path_request.motion_plan_request.reference_trajectories = reference_trajectories
+        # else:
+        #     self.kinematic_path_request.motion_plan_request.reference_trajectories = None
+        self.plan_kinematic_path_client.wait_for_service()
+        response = self.plan_kinematic_path_client.call(
+            self.pilz_path_request)
+        self.clear_goal_constraints_pilz()
+        self.motion_plan_pilz_ = response.motion_plan_response.trajectory
+
+        return response
         
-        goal_action_request = MoveGroupSequence.Goal()
-        goal_action_request.planning_options = PlanningOptions()
-        # goal_action_request.planning_options.planning_scene_diff.is_diff = True
-        goal_action_request.planning_options.plan_only = False
-        # goal_action_request.planning_group = self.arm_group_name
-        goal_action_request.request = sequence_request
-
-        self.get_logger().info("Sending")
-        # goalRequest = HybridPlanning.Request()
-        # goalRequest. = goal_action_request
-        goal = await self.movegroup_action_client.send_goal_async(goal_action_request, self.feedback_callback)
-        self.get_logger().info("goal send")
-        # self.motion_plan_ = goal.motion_plan_response.trajectory
-        # result = await self.get_trajectory_result(goal)
-        # self.get_logger().info(str(result))
-        self.get_logger().info("goal: " + str(goal))
-        
-        return goal
 
     async def wait_for_goal(self, goal):
         result = await goal.get_result_async()
