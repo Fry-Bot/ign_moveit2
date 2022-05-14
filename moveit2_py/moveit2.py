@@ -57,7 +57,7 @@ class MoveIt2Interface(Node):
         self.movegroup_action_client.wait_for_server(timeout_sec=2.0)
         self.jointJogPublisher = self.create_publisher(JointJog, '/servo_node/delta_joint_cmds', 10)
         self.get_logger().info("ign_moveit2_py initialised successfuly")
-        self.speed = 100.0
+        self.speed = 'auto'
 
     def get_speed(self):
         return self.speed
@@ -325,7 +325,7 @@ class MoveIt2Interface(Node):
         ser_traj_out = self._g.retime_trajectory(ser_ref_state_in, ser_traj_in, velocity_scaling_factor)
 
     def set_speed(self, speedPercentage: str):
-        self.speed = int(speedPercentage) * 1.0
+        self.speed = int(speedPercentage) * 1.0 if speedPercentage is not 'auto' else speedPercentage
 
     def move_to_joint_state(self, joint_state,
                             set_position=True,
@@ -575,7 +575,7 @@ class MoveIt2Interface(Node):
 
     async def plan_kinematic_path(self,
                             allowed_planning_time=5.0,
-                            num_planning_attempts=10, attached_collision_objects = [], path_constraints = None, joint_state = None) -> GetMotionPlan.Response:
+                            num_planning_attempts=10, attached_collision_objects = [], path_constraints = None, joint_state = None, auto_speed = 1.0) -> GetMotionPlan.Response:
         """
         Call `plan_kinematic_path` service, with goal set using either `set_joint_goal()`,
         `set_position_goal()`, `set_orientation_goal()` or `set_pose_goal()`.
@@ -606,7 +606,7 @@ class MoveIt2Interface(Node):
             self.kinematic_path_request.motion_plan_request.start_state.joint_state = joint_state
         self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
 
-        self.kinematic_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0
+        self.kinematic_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
         # if(path_constraints is not None):
         #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
         # # set trajectory constraints
@@ -959,7 +959,7 @@ class MoveIt2Interface(Node):
 
 
     async def plan_pilz_path(self, allowed_planning_time=5.0,
-                            num_planning_attempts=10, attached_collision_objects = [], path_constraints = None, joint_state = None) -> GetMotionPlan.Response:
+                            num_planning_attempts=10, attached_collision_objects = [], path_constraints = None, joint_state = None, auto_speed = 1.0) -> GetMotionPlan.Response:
         """
         Call `plan_kinematic_path` service, with goal set using either `set_joint_goal()`,
         `set_position_goal()`, `set_orientation_goal()` or `set_pose_goal()`.
@@ -990,8 +990,8 @@ class MoveIt2Interface(Node):
             self.pilz_path_request.motion_plan_request.start_state.joint_state = joint_state
         self.pilz_path_request.motion_plan_request.start_state.joint_state.velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.pilz_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
-        self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0
-        self.pilz_path_request.motion_plan_request.max_velocity_scaling_factor = self.speed / 100.0
+        self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
+        self.pilz_path_request.motion_plan_request.max_velocity_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
         self.pilz_path_request.motion_plan_request.max_cartesian_speed = 1.0
         # if(path_constraints is not None):
         #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
@@ -1008,7 +1008,7 @@ class MoveIt2Interface(Node):
 
         return response
         
-    async def plan_pilz_path_multipoint(self, goal_constraints, attached_collision_objects = [], path_constraints = []) -> GetCartesianPath.Response:
+    async def plan_pilz_path_multipoint(self, goal_constraints, attached_collision_objects = [], path_constraints = [], auto_speed = 1.0) -> GetCartesianPath.Response:
         """
         Call `compute_cartesian_path` service.
         """
@@ -1018,8 +1018,8 @@ class MoveIt2Interface(Node):
             goal_motion_request.group_name = self.arm_group_name
             goal_motion_request.num_planning_attempts = 10
             goal_motion_request.allowed_planning_time = 2.0
-            goal_motion_request.max_acceleration_scaling_factor = self.speed / 100.0
-            goal_motion_request.max_velocity_scaling_factor = self.speed / 100.0
+            goal_motion_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
+            goal_motion_request.max_velocity_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
 
             # goal_motion_request.max_cartesian_speed = 0.1
             # goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
