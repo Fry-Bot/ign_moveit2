@@ -53,8 +53,8 @@ class MoveIt2Interface(Node):
         self.hp_action_client = ActionClient(self, HybridPlanner, '/run_hybrid_planning')
         self.hp_action_client.wait_for_server(timeout_sec=2.0)
         # pilz_industrial_motion_planner
-        # self.movegroup_action_client = ActionClient(self, MoveGroupSequence, '/sequence_move_group')
-        # self.movegroup_action_client.wait_for_server(timeout_sec=20.0)
+        self.movegroup_action_client = ActionClient(self, MoveGroupSequence, '/sequence_move_group')
+        self.movegroup_action_client.wait_for_server(timeout_sec=2.0)
         self.jointJogPublisher = self.create_publisher(JointJog, '/servo_node/delta_joint_cmds', 10)
         self.get_logger().info("ign_moveit2_py initialised successfuly")
         self.speed = 100.0
@@ -734,7 +734,7 @@ class MoveIt2Interface(Node):
             joint_constraint.position = joint_positions[i]
             joint_constraint.tolerance_above = tolerance
             joint_constraint.tolerance_below = tolerance
-            joint_constraint.weight = weightmax_cartesian_speed
+            joint_constraint.weight = weight
 
             (joint_constraints.append(joint_constraint))
         return joint_constraints
@@ -1010,8 +1010,8 @@ class MoveIt2Interface(Node):
             goal_motion_request.group_name = self.arm_group_name
             goal_motion_request.num_planning_attempts = 10
             goal_motion_request.allowed_planning_time = 2.0
-            goal_motion_request.max_velocity_scaling_factor = 0.1
-            goal_motion_request.max_acceleration_scaling_factor = 0.1
+            goal_motion_request.max_acceleration_scaling_factor = self.speed / 100.0
+            goal_motion_request.max_velocity_scaling_factor = self.speed / 100.0
 
             # goal_motion_request.max_cartesian_speed = 0.1
             # goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
@@ -1022,18 +1022,17 @@ class MoveIt2Interface(Node):
             # goal_motion_request.workspace_parameters.max_corner.y = 6.0
             # goal_motion_request.workspace_parameters.min_corner.y = 0.0
             # goal_motion_request.planner_id = "geometric::BiTRRT"
-            # goal_motion_request.pipeline_id = "ompl"
-            # goal_motion_request.planner_id = "ompl" -=> no planner name => takes last groupname
-            goal_motion_request.pipeline_id = "PTP"
+            goal_motion_request.planner_id = "PTP"
+            goal_motion_request.pipeline_id = "pilz"
             goal_motion_request.goal_constraints = [goal]
-            # goal_motion_request.start_state.joint_state = self.get_joint_state()
-            # goal_motion_request.start_state.attached_collision_objects = attached_collision_objects
+            goal_motion_request.start_state.joint_state = self.get_joint_state()
+            goal_motion_request.start_state.attached_collision_objects = attached_collision_objects
             sequence_item = MotionSequenceItem()
             sequence_item.req = goal_motion_request
             if goal == goal_constraints[-1]:
                 sequence_item.blend_radius = 0.0 #0 for single goal
             else:
-                sequence_item.blend_radius = 0.01
+                sequence_item.blend_radius = 0.00 # 0.01
 
             
             sequence_request.items.append(sequence_item)
