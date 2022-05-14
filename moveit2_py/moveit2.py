@@ -525,6 +525,7 @@ class MoveIt2Interface(Node):
         self.pilz_path_request.motion_plan_request.planner_id = "PTP"
         self.pilz_path_request.motion_plan_request.pipeline_id = "pilz"
         self.pilz_path_request.motion_plan_request.group_name = self.arm_group_name
+        self.pilz_path_request.motion_plan_request.group_name = self.arm_group_name
         # self.pilz_path_request.motion_plan_request.num_planning_attempts = \
         # "Set during request"
         # self.pilz_path_request.motion_plan_request.allowed_planning_time = \
@@ -785,13 +786,17 @@ class MoveIt2Interface(Node):
         position_constraint = PositionConstraint()
         position_constraint.header.frame_id = "world" #frame
         position_constraint.link_name = self.arm_end_effector
+        
+        # position_constraint.target_point_offset.x = 0.005
+        # position_constraint.target_point_offset.y = 0.005
+        # position_constraint.target_point_offset.z = 0.005 # = position 
         position_constraint.constraint_region.primitive_poses.append(Pose())
         position_constraint.constraint_region.primitive_poses[0].position.x = float(
-            position[0])
+            position.x)
         position_constraint.constraint_region.primitive_poses[0].position.y = float(
-            position[1])
+            position.y)
         position_constraint.constraint_region.primitive_poses[0].position.z = float(
-            position[2])
+            position.z)
 
         # Goal is defined as a sphere with radius equal to tolerance
         position_constraint.constraint_region.primitives.append(
@@ -827,10 +832,11 @@ class MoveIt2Interface(Node):
         orientation_constraint = OrientationConstraint()
         orientation_constraint.header.frame_id = "world" # self.arm_base_link
         orientation_constraint.link_name = frame
-        orientation_constraint.orientation.x = float(quaternion[0])
-        orientation_constraint.orientation.y = float(quaternion[1])
-        orientation_constraint.orientation.z = float(quaternion[2])
-        orientation_constraint.orientation.w = float(quaternion[3])
+        # orientation_constraint.orientation.x = float(quaternion[0])
+        # orientation_constraint.orientation.y = float(quaternion[1])
+        # orientation_constraint.orientation.z = float(quaternion[2])
+        # orientation_constraint.orientation.w = float(quaternion[3])
+        orientation_constraint.orientation = quaternion
         orientation_constraint.absolute_x_axis_tolerance = tolerance
         orientation_constraint.absolute_y_axis_tolerance = tolerance
         orientation_constraint.absolute_z_axis_tolerance = tolerance
@@ -902,7 +908,7 @@ class MoveIt2Interface(Node):
         self.cartesian_path_request.link_name = self.arm_end_effector
         self.cartesian_path_request.waypoints = []
         self.cartesian_path_request.max_step = 0.01
-        self.cartesian_path_request.jump_threshold = 5.0 #0.01
+        self.cartesian_path_request.jump_threshold = 5.0 # 5.0 #0.01
         # self.cartesian_path_request.prismatic_jump_threshold = 0.0
         # self.cartesian_path_request.revolute_jump_threshold = 0.0
         self.cartesian_path_request.avoid_collisions = True
@@ -977,14 +983,16 @@ class MoveIt2Interface(Node):
             for orientation_constraint in contraints.orientation_constraints:
                 orientation_constraint.header.stamp = clock_time_now_msg
         # set robot state
-        # self.pilz_path_request.motion_plan_request.start_state.is_diff = True
+        self.pilz_path_request.motion_plan_request.start_state.is_diff = True
         if joint_state == None:
             self.pilz_path_request.motion_plan_request.start_state.joint_state = self.get_joint_state()
         else:
             self.pilz_path_request.motion_plan_request.start_state.joint_state = joint_state
+        self.pilz_path_request.motion_plan_request.start_state.joint_state.velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.pilz_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
         self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0
         self.pilz_path_request.motion_plan_request.max_velocity_scaling_factor = self.speed / 100.0
+        self.pilz_path_request.motion_plan_request.max_cartesian_speed = 1.0
         # if(path_constraints is not None):
         #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
         # # set trajectory constraints
@@ -1219,3 +1227,5 @@ class MoveIt2Interface(Node):
             joint_trajectory.points[i].time_from_start.nanosec = int(2e8)
 
         return joint_trajectory
+
+  
