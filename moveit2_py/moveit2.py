@@ -53,7 +53,7 @@ class MoveIt2Interface(Node):
         self.hp_action_client = ActionClient(self, HybridPlanner, '/run_hybrid_planning')
         self.hp_action_client.wait_for_server(timeout_sec=2.0)
         # pilz_industrial_motion_planner
-        self.movegroup_action_client = ActionClient(self, MoveGroupSequence, '/sequence_move_group')
+        # self.movegroup_action_client = ActionClient(self, MoveGroupSequence, '/sequence_move_group')
         # self.movegroup_action_client.wait_for_server(timeout_sec=20.0)
         self.jointJogPublisher = self.create_publisher(JointJog, '/servo_node/delta_joint_cmds', 10)
         self.get_logger().info("ign_moveit2_py initialised successfuly")
@@ -522,8 +522,8 @@ class MoveIt2Interface(Node):
         # self.pilz_path_request.motion_plan_request.path_constraints = "Ignored"
         # self.pilz_path_request.motion_plan_request.trajectory_constraints = "Ignored"
         # self.pilz_path_request.motion_plan_request.reference_trajectories = "Ignored"
-        # self.pilz_path_request.motion_plan_request.planner_id = "BiTRRT"
-        self.pilz_path_request.motion_plan_request.pipeline_id = "move_group"
+        self.pilz_path_request.motion_plan_request.planner_id = "PTP"
+        self.pilz_path_request.motion_plan_request.pipeline_id = "pilz"
         self.pilz_path_request.motion_plan_request.group_name = self.arm_group_name
         # self.pilz_path_request.motion_plan_request.num_planning_attempts = \
         # "Set during request"
@@ -564,7 +564,7 @@ class MoveIt2Interface(Node):
         Set maximum acceleration of joints as a factor of joint limits.
         """
         self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = \
-            scaling_factor if scaling_factor < 1.0 else 0.0
+            scaling_factor
 
     def set_max_cartesian_speed_pilz(self, speed):
         """
@@ -605,7 +605,7 @@ class MoveIt2Interface(Node):
             self.kinematic_path_request.motion_plan_request.start_state.joint_state = joint_state
         self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
 
-        self.kinematic_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed != 100 else 0.0
+        self.kinematic_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0
         # if(path_constraints is not None):
         #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
         # # set trajectory constraints
@@ -983,7 +983,8 @@ class MoveIt2Interface(Node):
         else:
             self.pilz_path_request.motion_plan_request.start_state.joint_state = joint_state
         self.pilz_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
-        self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed != 100 else 0.0
+        self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0
+        self.pilz_path_request.motion_plan_request.max_velocity_scaling_factor = self.speed / 100.0
         # if(path_constraints is not None):
         #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
         # # set trajectory constraints
@@ -999,6 +1000,62 @@ class MoveIt2Interface(Node):
 
         return response
         
+    async def plan_pilz_path_multipoint(self, goal_constraints, attached_collision_objects = [], path_constraints = []) -> GetCartesianPath.Response:
+        """
+        Call `compute_cartesian_path` service.
+        """
+        sequence_request = MotionSequenceRequest()
+        for goal in goal_constraints:
+            goal_motion_request = MotionPlanRequest()
+            goal_motion_request.group_name = self.arm_group_name
+            goal_motion_request.num_planning_attempts = 10
+            goal_motion_request.allowed_planning_time = 2.0
+            goal_motion_request.max_velocity_scaling_factor = 0.1
+            goal_motion_request.max_acceleration_scaling_factor = 0.1
+
+            # goal_motion_request.max_cartesian_speed = 0.1
+            # goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
+            # goal_motion_request.workspace_parameters.min_corner.x = 0.0
+            # goal_motion_request.workspace_parameters.max_corner.z = 2.4
+            # goal_motion_request.workspace_parameters.min_corner.z = 0.0
+            # goal_motion_request.workspace_parameters.max_corner.x = 2.4
+            # goal_motion_request.workspace_parameters.max_corner.y = 6.0
+            # goal_motion_request.workspace_parameters.min_corner.y = 0.0
+            # goal_motion_request.planner_id = "geometric::BiTRRT"
+            # goal_motion_request.pipeline_id = "ompl"
+            # goal_motion_request.planner_id = "ompl" -=> no planner name => takes last groupname
+            goal_motion_request.pipeline_id = "PTP"
+            goal_motion_request.goal_constraints = [goal]
+            # goal_motion_request.start_state.joint_state = self.get_joint_state()
+            # goal_motion_request.start_state.attached_collision_objects = attached_collision_objects
+            sequence_item = MotionSequenceItem()
+            sequence_item.req = goal_motion_request
+            if goal == goal_constraints[-1]:
+                sequence_item.blend_radius = 0.0 #0 for single goal
+            else:
+                sequence_item.blend_radius = 0.01
+
+            
+            sequence_request.items.append(sequence_item)
+        
+        goal_action_request = MoveGroupSequence.Goal()
+        goal_action_request.planning_options = PlanningOptions()
+        # goal_action_request.planning_options.planning_scene_diff.is_diff = True
+        goal_action_request.planning_options.plan_only = False
+        # goal_action_request.planning_group = self.arm_group_name
+        goal_action_request.request = sequence_request
+
+        self.get_logger().info("Sending")
+        # goalRequest = HybridPlanning.Request()
+        # goalRequest. = goal_action_request
+        goal = await self.movegroup_action_client.send_goal_async(goal_action_request, self.feedback_callback)
+        self.get_logger().info("goal send")
+        # self.motion_plan_ = goal.motion_plan_response.trajectory
+        # result = await self.get_trajectory_result(goal)
+        # self.get_logger().info(str(result))
+        self.get_logger().info("goal: " + str(goal))
+        
+        return goal
 
     async def wait_for_goal(self, goal):
         result = await goal.get_result_async()
