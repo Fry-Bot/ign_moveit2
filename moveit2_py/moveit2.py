@@ -53,8 +53,8 @@ class MoveIt2Interface(Node):
         self.hp_action_client = ActionClient(self, HybridPlanner, '/run_hybrid_planning')
         self.hp_action_client.wait_for_server(timeout_sec=2.0)
         # pilz_industrial_motion_planner
-        self.movegroup_action_client = ActionClient(self, MoveGroupSequence, '/sequence_move_group')
-        self.movegroup_action_client.wait_for_server(timeout_sec=2.0)
+        # self.movegroup_action_client = ActionClient(self, MoveGroupSequence, '/sequence_move_group')
+        # self.movegroup_action_client.wait_for_server(timeout_sec=2.0)
         self.jointJogPublisher = self.create_publisher(JointJog, '/servo_node/delta_joint_cmds', 10)
         self.get_logger().info("ign_moveit2_py initialised successfuly")
         self.speed = 'auto'
@@ -325,7 +325,7 @@ class MoveIt2Interface(Node):
         ser_traj_out = self._g.retime_trajectory(ser_ref_state_in, ser_traj_in, velocity_scaling_factor)
 
     def set_speed(self, speedPercentage: str):
-        self.speed = int(speedPercentage) * 1.0 if speedPercentage is not 'auto' else speedPercentage
+        self.speed = int(speedPercentage) * 1.0 if speedPercentage != 'auto' else speedPercentage
 
     def move_to_joint_state(self, joint_state,
                             set_position=True,
@@ -522,8 +522,8 @@ class MoveIt2Interface(Node):
         # self.pilz_path_request.motion_plan_request.path_constraints = "Ignored"
         # self.pilz_path_request.motion_plan_request.trajectory_constraints = "Ignored"
         # self.pilz_path_request.motion_plan_request.reference_trajectories = "Ignored"
-        self.pilz_path_request.motion_plan_request.planner_id = "PTP"
-        self.pilz_path_request.motion_plan_request.pipeline_id = "pilz"
+        self.pilz_path_request.motion_plan_request.planner_id = "LIN"
+        self.pilz_path_request.motion_plan_request.pipeline_id = "pilz_industrial_motion_planner"
         self.pilz_path_request.motion_plan_request.group_name = self.arm_group_name
         self.pilz_path_request.motion_plan_request.group_name = self.arm_group_name
         # self.pilz_path_request.motion_plan_request.num_planning_attempts = \
@@ -606,7 +606,7 @@ class MoveIt2Interface(Node):
             self.kinematic_path_request.motion_plan_request.start_state.joint_state = joint_state
         self.kinematic_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
 
-        self.kinematic_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
+        self.kinematic_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed != 'auto' else auto_speed
         # if(path_constraints is not None):
         #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
         # # set trajectory constraints
@@ -990,8 +990,8 @@ class MoveIt2Interface(Node):
             self.pilz_path_request.motion_plan_request.start_state.joint_state = joint_state
         self.pilz_path_request.motion_plan_request.start_state.joint_state.velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.pilz_path_request.motion_plan_request.start_state.attached_collision_objects = attached_collision_objects
-        self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
-        self.pilz_path_request.motion_plan_request.max_velocity_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
+        self.pilz_path_request.motion_plan_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed != 'auto' else auto_speed
+        self.pilz_path_request.motion_plan_request.max_velocity_scaling_factor = self.speed / 100.0 if self.speed != 'auto' else auto_speed / 2.0
         self.pilz_path_request.motion_plan_request.max_cartesian_speed = 1.0
         # if(path_constraints is not None):
         #     self.kinematic_path_request.motion_plan_request.path_constraints = path_constraints;
@@ -1018,8 +1018,8 @@ class MoveIt2Interface(Node):
             goal_motion_request.group_name = self.arm_group_name
             goal_motion_request.num_planning_attempts = 10
             goal_motion_request.allowed_planning_time = 2.0
-            goal_motion_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
-            goal_motion_request.max_velocity_scaling_factor = self.speed / 100.0 if self.speed is not 'auto' else auto_speed
+            goal_motion_request.max_acceleration_scaling_factor = self.speed / 100.0 if self.speed != 'auto' else auto_speed
+            goal_motion_request.max_velocity_scaling_factor = self.speed / 100.0 if self.speed != 'auto' else auto_speed
 
             # goal_motion_request.max_cartesian_speed = 0.1
             # goal_motion_request.cartesian_speed_end_effector_link = self.arm_end_effector
@@ -1030,8 +1030,8 @@ class MoveIt2Interface(Node):
             # goal_motion_request.workspace_parameters.max_corner.y = 6.0
             # goal_motion_request.workspace_parameters.min_corner.y = 0.0
             # goal_motion_request.planner_id = "geometric::BiTRRT"
-            goal_motion_request.planner_id = "PTP"
-            goal_motion_request.pipeline_id = "pilz"
+            goal_motion_request.planner_id = "LIN"
+            goal_motion_request.pipeline_id = "pilz_industrial_motion_planner"
             goal_motion_request.goal_constraints = [goal]
             goal_motion_request.start_state.joint_state = self.get_joint_state()
             goal_motion_request.start_state.attached_collision_objects = attached_collision_objects
